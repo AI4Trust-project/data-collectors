@@ -1,0 +1,47 @@
+apiVersion: compute.functionmesh.io/v1alpha1
+kind: Function
+metadata:
+  name: python-dynamic-router
+  namespace: default
+spec:
+  image: dynamic-router:latest # using function image here
+  imagePullPolicy: Never
+  className: dynamicrouter.DynamicRouting
+  forwardSourceMessageProperty: true
+  maxPendingAsyncRequests: 1000
+  replicas: 1
+  maxReplicas: 5
+  logTopic: persistent://public/default/logging-function-logs
+  input:
+    topics:
+      - persistent://public/default/popular-italy
+    typeClassName: java.lang.String
+  output:
+    topics:
+      - persistent://public/default/thumbnails
+      - persistent://public/default/liked-comments
+      - persistent://public/default/common-ita-words
+    typeClassName: java.lang.String
+  resources:
+    requests:
+      cpu: "0.1"
+      memory: 1G
+    limits:
+      cpu: "0.2"
+      memory: 1.1G
+  pulsar:
+    pulsarConfig: 'test-pulsar'
+  python:
+    py: /pulsar/dynamicrouter.py
+    pyLocation: ''
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-pulsar
+  namespace: default
+data:
+  webServiceURL: http://192.168.49.2:32311/
+  brokerServiceURL: pulsar://192.168.49.2:31482/
+---

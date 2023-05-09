@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Pod
+metadata:
+   name: youtube-collector
+spec:
+   containers:
+   - name: youtube-comment-collector-italy
+     image: collector:latest
+     imagePullPolicy: Never

@@ -1,7 +1,7 @@
 apiVersion: compute.functionmesh.io/v1alpha1
 kind: Function
 metadata:
-  name: python-youtube-shcema
+  name: python-youtube-unifier
   namespace: default
 spec:
   image: youtubeschema:latest # using function image here
@@ -29,7 +29,7 @@ spec:
       cpu: "0.2"
       memory: 1.1G
   pulsar:
-    pulsarConfig: 'test-pulsar'
+    pulsarConfig: 'test-pulsar-uni'
   python:
     py: /pulsar/dynamicrouter.py
     pyLocation: ''
@@ -38,7 +38,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-pulsar
+  name: test-pulsar-uni
   namespace: default
 data:
   webServiceURL: http://192.168.49.2:32311/

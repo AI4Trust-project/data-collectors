@@ -1,18 +1,20 @@
-from pulsar import Function
-from minio import Minio
-import urllib.request
-import json
-import pandas as pd
 import io
+import json
+import os
+
+import pandas as pd
+from minio import Minio
+from pulsar import Function
+
 
 # The classic ExclamationFunction that appends an exclamation at the end
 # of the input
 class SinkCSV(Function):
     def __init__(self):
         self.minio_client = Minio(
-            "minio_url",
-            access_key="key",
-            secret_key="key",
+            os.environ.get("MINIO_HOME"),
+            access_key=os.environ.get("MINIO_ACCESS_KEY"),
+            secret_key=os.environ.get("MINIO_SECRET_KEY"),
             secure=False,
         )
 
@@ -20,9 +22,7 @@ class SinkCSV(Function):
 
         file_exists = False
         try:
-            obj = self.minio_client.get_object(
-                "csvbucket",
-                "test.csv")
+            obj = self.minio_client.get_object("csvbucket", "test.csv")
             df = pd.read_csv(obj)
             file_exists = True
         except Exception:
@@ -30,21 +30,24 @@ class SinkCSV(Function):
 
         if file_exists:
             my_new_data = pd.DataFrame(data, index=data.keys())
-            df = pd.concat([df, my_new_data], keys=data.keys()).drop_duplicates().reset_index(drop=True)
+            df = (
+                pd.concat([df, my_new_data], keys=data.keys())
+                .drop_duplicates()
+                .reset_index(drop=True)
+            )
 
-
-        csv = df.to_csv(index=False).encode('utf-8')
+        csv = df.to_csv(index=False).encode("utf-8")
 
         self.minio_client.put_object(
             "csvbucket",
             "test.csv",
             data=io.BytesIO(csv),
             length=len(csv),
-            content_type='application/csv')
+            content_type="application/csv",
+        )
 
     def process(self, input, context):
         logger = context.get_logger()
         comment = json.loads(input)
 
         self.create_or_update_csv_in_minio(comment)
-    

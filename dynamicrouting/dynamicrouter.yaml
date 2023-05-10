@@ -30,7 +30,7 @@ spec:
       cpu: "0.2"
       memory: 1.1G
   pulsar:
-    pulsarConfig: 'test-pulsar'
+    pulsarConfig: 'test-pulsar-router'
   python:
     py: /pulsar/dynamicrouter.py
     pyLocation: ''
@@ -39,7 +39,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-pulsar
+  name: test-pulsar-router
   namespace: default
 data:
   webServiceURL: http://192.168.49.2:32311/

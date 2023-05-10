@@ -24,7 +24,7 @@ spec:
       cpu: "0.2"
       memory: 1.1G
   pulsar:
-    pulsarConfig: 'test-pulsar'
+    pulsarConfig: 'test-pulsar-sink'
   python:
     py: /pulsar/sink-csv.py
     pyLocation: ''
@@ -33,9 +33,12 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-pulsar
+  name: test-pulsar-sink
   namespace: default
 data:
   webServiceURL: http://192.168.49.2:32311/
   brokerServiceURL: pulsar://192.168.49.2:31482/
+  MINIO_HOME: 
+  MINIO_ACCESS_KEY: 
+  MINIO_SECRET_KEY: 
 ---

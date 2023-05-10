@@ -27,18 +27,22 @@ spec:
       cpu: "0.2"
       memory: 1.1G
   pulsar:
-    pulsarConfig: 'test-pulsar'
+    pulsarConfig: 'test-pulsar-thmb'
   python:
     py: /pulsar/thumbnaildownloader.py
     pyLocation: ''
+
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-pulsar
+  name: test-pulsar-thmb
   namespace: default
 data:
   webServiceURL: http://192.168.49.2:32311/
   brokerServiceURL: pulsar://192.168.49.2:31482/
+  MINIO_HOME: 
+  MINIO_ACCESS_KEY: 
+  MINIO_SECRET_KEY: 
 ---

@@ -7,3 +7,6 @@ spec:
    - name: youtube-comment-collector-italy
      image: collector:latest
      imagePullPolicy: Never
+     env:
+     - name: YOUTUBE_API_KEY
+       value: ""

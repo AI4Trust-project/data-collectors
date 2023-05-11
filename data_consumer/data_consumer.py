@@ -24,7 +24,7 @@ try:
         # Load CSV data into a Pandas DataFrame
         df = pd.read_csv(BytesIO(csv_data.read()))
 
-        # Print the first 5 rows of the DataFrame
+        # Count lines with the label HATE_SPEECH
         print(
             "Number of hate speech comments: {} from {}\n".format(
                 len(df.loc[df["hate_speech_classification"] == "HATE_SPEECH"]), len(df)

@@ -22,3 +22,8 @@ cd ..
 cd youtube_collector
 minikube image build -t collector:latest .
 kubectl apply -f youtube_collector.yaml
+cd ..
+cd data_consumer
+minikube image build -t consumer:latest .
+kubectl apply -f data_consumer.yaml
+cd ..

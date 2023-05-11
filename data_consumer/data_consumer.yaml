@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+   name: comments-consumer
+spec:
+   containers:
+   - name: youtube-comment-consumer
+     image: consumer:latest
+     imagePullPolicy: Never
+     env:
+     - name: MINIO_HOME
+       value: ""
+     - name: MINIO_ACCESS_KEY 
+       value: 
+     - name: MINIO_SECRET_KEY
+       value: 

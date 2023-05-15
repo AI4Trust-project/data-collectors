@@ -1,5 +1,4 @@
 import os
-import time
 from io import BytesIO
 
 import pandas as pd
@@ -13,9 +12,9 @@ client = Minio(
     secure=False,
 )
 
-try:
-    while True:
 
+while True:
+    try:
         # Read CSV file from MinIO
         bucket_name = "csvbucket"
         file_name = "test.csv"
@@ -30,7 +29,5 @@ try:
                 len(df.loc[df["hate_speech_classification"] == "HATE_SPEECH"]), len(df)
             )
         )
-        time.sleep(5)
-
-except Exception as e:
-    print(e)
+    except Exception as e:
+        print(e)

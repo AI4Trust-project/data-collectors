@@ -38,13 +38,16 @@ class SinkCSV(Function):
 
         csv = df.to_csv(index=False).encode("utf-8")
 
-        self.minio_client.put_object(
-            "csvbucket",
-            "test.csv",
-            data=io.BytesIO(csv),
-            length=len(csv),
-            content_type="application/csv",
-        )
+        try:
+            self.minio_client.put_object(
+                "csvbucket",
+                "test.csv",
+                data=io.BytesIO(csv),
+                length=len(csv),
+                content_type="application/csv",
+            )
+        except Exception as e:
+            print(e)
 
     def process(self, input, context):
         logger = context.get_logger()

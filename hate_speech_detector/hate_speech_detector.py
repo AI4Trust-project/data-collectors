@@ -15,7 +15,7 @@ class HateSpeechDetector(Function):
         logger = context.get_logger()
         comment = json.loads(input)
         # processing
-        time.sleep(15)
+        time.sleep(2)
         random_label = random.choice(["HATE_SPEECH", "NOT_HATE_SPEECH"])
         comment["hate_speech_classification"] = str(random_label)
         comment["type"] = "processing_ml"

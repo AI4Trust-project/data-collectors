@@ -21,7 +21,7 @@ video_ids = []
 try:
     videos_response = (
         youtube.videos()
-        .list(part="id", chart="mostPopular", regionCode="IT", maxResults=10)
+        .list(part="id", chart="mostPopular", regionCode="IT", maxResults=50)
         .execute()
     )
     for video in videos_response.get("items", []):
@@ -29,6 +29,7 @@ try:
 except Exception as e:
     print("Error get popular videos:", e)
 # Get the comments for each video
+count = 0
 for video_id in video_ids:
     try:
         comment_threads = (
@@ -65,8 +66,14 @@ for video_id in video_ids:
 
             # send comment
             producer.send(json.dumps(comment).encode("utf-8"))
-            time.sleep(10)
+            count+=1
+            # time.sleep(10)
 
     except Exception as e:
         print("Error get comment:", e)
         print(video_id)
+        continue
+
+while True:
+    print("finished")
+    print(count)

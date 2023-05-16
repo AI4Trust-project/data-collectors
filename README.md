@@ -104,13 +104,24 @@ Start port foward:
 kubectl port-forward pod/minio 9000 9090
 ```
 
-Login in in the Minio Console, create the credentials and two buckets:
+Login in the Minio Console (http://localhost:9000) with the default credentials (`minioadmin:minioadmin`) and create two buckets:
 ```
 csvbucket
 thumbnails
 ```
-# Running
+Create the access keys on minio and update the following yaml files:
+```
+thumbnaildownloader/thumbnaildownloader.yaml
+data_consumer/data_consumer.yaml
+pulsar-sink/cloud-sink.yaml
+```
 
+# Running
+Go on https://console.cloud.google.com/ create a project and create a Youtube API key and update the yaml file:
+
+```
+youtube_collector/youtube_collector.yaml
+```
 After the installation of the requirements simply deploy with the script:
 
 ```bash

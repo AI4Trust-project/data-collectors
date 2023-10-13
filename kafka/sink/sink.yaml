@@ -1,0 +1,81 @@
+metadata:
+  name: sink
+  labels:
+    nuclio.io/project-name: default
+  resourceVersion: "92106"
+spec:
+  handler: "main:handler"
+  runtime: "python:3.9"
+  env:
+    - name: KAFKA_BROKER
+      valueFrom:
+        secretKeyRef:
+          name: kafkacredentials
+          key: broker_url
+    - name: MINIO_HOME
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: miniohome
+    - name: MINIO_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: accesskey
+    - name: MINIO_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: secretkey
+  resources:
+    requests:
+      cpu: 25m
+      memory: 1Mi
+  imageHash: "1697191311589818663"
+  triggers:
+    default-http:
+      class: ""
+      kind: http
+      name: default-http
+      maxWorkers: 1
+      attributes:
+        serviceType: ClusterIP
+    kafkatrigger:
+      class: ""
+      kind: kafka-cluster
+      name: kafkatrigger
+      maxWorkers: 1
+      explicitAckMode: disable
+      workerTerminationTimeout: 5s
+      attributes:
+        brokers:
+          - 'my-cluster-kafka-brokers.kafka:9092'
+        consumerGroup: group1
+        fetchDefault: 1048576
+        heartbeatInterval: 3s
+        initialOffset: latest
+        maxWaitHandlerDuringRebalance: 5s
+        rebalanceTimeout: 60s
+        sasl:
+          enable: false
+          password: ""
+          user: ""
+        sessionTimeout: 10s
+        topics:
+          - complete-youtube
+        workerAllocationMode: pool
+  version: 1
+  alias: latest
+  build:
+    functionSourceCode: aW1wb3J0IGlvDQppbXBvcnQganNvbg0KaW1wb3J0IG9zDQoNCmltcG9ydCBwYW5kYXMgYXMgcGQNCmZyb20gbWluaW8gaW1wb3J0IE1pbmlvDQpmcm9tIGthZmthIGltcG9ydCBLYWZrYVByb2R1Y2VyDQoNCg0KZGVmIGluaXRfY29udGV4dChjb250ZXh0KToNCiAgICBjbGllbnQgPSBNaW5pbygNCiAgICAgICAgb3MuZW52aXJvbi5nZXQoIk1JTklPX0hPTUUiKSwNCiAgICAgICAgYWNjZXNzX2tleT1vcy5lbnZpcm9uLmdldCgiTUlOSU9fQUNDRVNTX0tFWSIpLA0KICAgICAgICBzZWNyZXRfa2V5PW9zLmVudmlyb24uZ2V0KCJNSU5JT19TRUNSRVRfS0VZIiksDQogICAgICAgIHNlY3VyZT1GYWxzZSwNCiAgICApDQoNCiAgICBwcm9kdWNlciA9IEthZmthUHJvZHVjZXIoDQogICAgICAgIGJvb3RzdHJhcF9zZXJ2ZXJzPVtvcy5lbnZpcm9uLmdldCgiS0FGS0FfQlJPS0VSIildLA0KICAgICAgICB2YWx1ZV9zZXJpYWxpemVyPWxhbWJkYSB4OiBqc29uLmR1bXBzKHgpLmVuY29kZSgidXRmLTgiKSwNCiAgICApDQoNCiAgICBzZXRhdHRyKGNvbnRleHQsICJwcm9kdWNlciIsIHByb2R1Y2VyKQ0KICAgIHNldGF0dHIoY29udGV4dCwgImNsaWVudCIsIGNsaWVudCkNCg0KDQpkZWYgY3JlYXRlX29yX3VwZGF0ZV9jc3ZfaW5fbWluaW8oY29udGV4dCwgZGF0YSk6DQogICAgZmlsZV9leGlzdHMgPSBGYWxzZQ0KICAgIHRyeToNCiAgICAgICAgb2JqID0gY29udGV4dC5jbGllbnQuZ2V0X29iamVjdCgiY3N2YnVja2V0IiwgInRlc3QuY3N2IikNCiAgICAgICAgZGYgPSBwZC5yZWFkX2NzdihvYmopDQogICAgICAgIGZpbGVfZXhpc3RzID0gVHJ1ZQ0KICAgIGV4Y2VwdCBFeGNlcHRpb246DQogICAgICAgIGRmID0gcGQuRGF0YUZyYW1lKGRhdGEsIGluZGV4PWRhdGEua2V5cygpKQ0KDQogICAgaWYgZmlsZV9leGlzdHM6DQogICAgICAgIG15X25ld19kYXRhID0gcGQuRGF0YUZyYW1lKGRhdGEsIGluZGV4PWRhdGEua2V5cygpKQ0KICAgICAgICBkZiA9ICgNCiAgICAgICAgICAgIHBkLmNvbmNhdChbZGYsIG15X25ld19kYXRhXSwga2V5cz1kYXRhLmtleXMoKSkNCiAgICAgICAgICAgIC5kcm9wX2R1cGxpY2F0ZXMoKQ0KICAgICAgICAgICAgLnJlc2V0X2luZGV4KGRyb3A9VHJ1ZSkNCiAgICAgICAgKQ0KDQogICAgY3N2ID0gZGYudG9fY3N2KGluZGV4PUZhbHNlKS5lbmNvZGUoInV0Zi04IikNCg0KICAgIHRyeToNCiAgICAgICAgY29udGV4dC5jbGllbnQucHV0X29iamVjdCgNCiAgICAgICAgICAgICJjc3ZidWNrZXQiLA0KICAgICAgICAgICAgInRlc3QuY3N2IiwNCiAgICAgICAgICAgIGRhdGE9aW8uQnl0ZXNJTyhjc3YpLA0KICAgICAgICAgICAgbGVuZ3RoPWxlbihjc3YpLA0KICAgICAgICAgICAgY29udGVudF90eXBlPSJhcHBsaWNhdGlvbi9jc3YiLA0KICAgICAgICApDQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOg0KICAgICAgICBwcmludChlKQ0KDQoNCmRlZiBoYW5kbGVyKGNvbnRleHQsIGV2ZW50KToNCiAgICBjb21tZW50ID0ganNvbi5sb2FkcyhldmVudC5ib2R5LmRlY29kZSgidXRmLTgiKSkNCiAgICBjcmVhdGVfb3JfdXBkYXRlX2Nzdl9pbl9taW5pbyhjb250ZXh0LCBjb21tZW50KQ0K
+    commands:
+      - 'pip install kafka-python pandas minio'
+    runtimeAttributes:
+      repositories: []
+    codeEntryType: sourceCode
+    timestamp: 1697191486
+  loggerSinks:
+    - level: debug
+  platform: {}
+  securityContext: {}
+  eventTimeout: ""

@@ -40,6 +40,6 @@ metadata:
   name: test-pulsar-hs
   namespace: default
 data:
-  webServiceURL: http://192.168.49.2:32311/
-  brokerServiceURL: pulsar://192.168.49.2:31482/
+  webServiceURL: http://192.168.49.2:31423/
+  brokerServiceURL: pulsar://192.168.49.2:31640/
 ---

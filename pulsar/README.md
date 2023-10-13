@@ -2,7 +2,7 @@
 
 This repository contains a series of scripts collect and process Youtube Comments throught Apache Pulsar.
 
-![PoC Diagram](imgs/youtube_diagram.png)
+![PoC Diagram](../imgs/youtube_diagram.png)
 
 # Requirements
 
@@ -16,7 +16,7 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube
 Start cluster
 
 ```bash
-minikube start
+minikube start --memory=8192 --cpus=4 --kubernetes-version=v1.24.1
 ```
 
 Start dashboard:
@@ -74,6 +74,16 @@ minikube service pulsar-mini-proxy -n pulsar
 ## Install Function Mesh
 
 ```bash
+
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm install \
+  cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version v1.8.0 \
+  --set installCRDs=true
+
 helm repo add function-mesh http://charts.functionmesh.io/
 helm repo update
 export FUNCTION_MESH_RELEASE_NAME=function-mesh

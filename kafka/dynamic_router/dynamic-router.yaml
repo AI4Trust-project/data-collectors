@@ -1,0 +1,66 @@
+metadata:
+  name: dynamic-router
+  labels:
+    nuclio.io/project-name: default
+  resourceVersion: "74633"
+spec:
+  handler: "main:handler"
+  runtime: "python:3.9"
+  env:
+    - name: KAFKA_BROKER
+      valueFrom:
+        secretKeyRef:
+          name: kafkacredentials
+          key: broker_url
+  resources:
+    requests:
+      cpu: 25m
+      memory: 1Mi
+  imageHash: "1697184162859425361"
+  triggers:
+    default-http:
+      class: ""
+      kind: http
+      name: default-http
+      maxWorkers: 1
+      attributes:
+        serviceType: ClusterIP
+    kafka-trigger:
+      class: ""
+      kind: kafka-cluster
+      name: kafka-trigger
+      maxWorkers: 1
+      explicitAckMode: disable
+      workerTerminationTimeout: 5s
+      attributes:
+        brokers:
+          - 'my-cluster-kafka-brokers.kafka:9092'
+        consumerGroup: group1
+        fetchDefault: 1048576
+        heartbeatInterval: 3s
+        initialOffset: latest
+        maxWaitHandlerDuringRebalance: 5s
+        rebalanceTimeout: 60s
+        sasl:
+          enable: false
+          password: ""
+          user: ""
+        sessionTimeout: 10s
+        topics:
+          - popular-italy
+        workerAllocationMode: pool
+  version: 1
+  alias: latest
+  build:
+    functionSourceCode: aW1wb3J0IGpzb24NCmltcG9ydCBvcw0KDQpmcm9tIGthZmthIGltcG9ydCBLYWZrYVByb2R1Y2VyDQoNCnRodW1ibmFpbF90b3BpYyA9ICJ0aHVtYm5haWxzIg0KbGlrZWRfY29tbWVudF90b3BpYyA9ICJsaWtlZC1jb21tZW50cyINCmNvbW1vbl93b3Jkc190b3BpYyA9ICJjb21tb24taXRhLXdvcmRzIg0KaXRhbGlhbl9jb21tb25fd29yZHMgPSBbDQogICAgImRpIiwNCiAgICAiY2hlIiwNCiAgICAiw6giLA0KICAgICJsYSIsDQogICAgImlsIiwNCiAgICAiYSIsDQogICAgIm5vbiIsDQogICAgImUiLA0KICAgICJ1biIsDQogICAgImluIiwNCiAgICAiY29uIiwNCiAgICAibWkiLA0KICAgICJwZXIiLA0KICAgICJzb25vIiwNCiAgICAibWEiLA0KICAgICJoYWkiLA0KICAgICJjaSIsDQogICAgInRpIiwNCiAgICAibG8iLA0KICAgICJsJyIsDQpdDQoNCg0KZGVmIGluaXRfY29udGV4dChjb250ZXh0KToNCiAgICBwcm9kdWNlciA9IEthZmthUHJvZHVjZXIoDQogICAgICAgIGJvb3RzdHJhcF9zZXJ2ZXJzPVtvcy5lbnZpcm9uLmdldCgiS0FGS0FfQlJPS0VSIildLA0KICAgICAgICB2YWx1ZV9zZXJpYWxpemVyPWxhbWJkYSB4OiBqc29uLmR1bXBzKHgpLmVuY29kZSgidXRmLTgiKSwNCiAgICApDQoNCiAgICBzZXRhdHRyKGNvbnRleHQsICJwcm9kdWNlciIsIHByb2R1Y2VyKQ0KDQoNCmRlZiBmaW5kX2tleV93b3Jkcyhjb21tZW50OiBzdHIpOg0KICAgIGZvciB3b3JkIGluIGl0YWxpYW5fY29tbW9uX3dvcmRzOg0KICAgICAgICBpZiB3b3JkIGluIGNvbW1lbnQ6DQogICAgICAgICAgICByZXR1cm4gVHJ1ZQ0KICAgIHJldHVybiBGYWxzZQ0KDQoNCmRlZiBoYW5kbGVyKGNvbnRleHQsIGV2ZW50KToNCiAgICBjb250ZXh0LmxvZ2dlci5pbmZvKCJNZXNzYWdlIENvbnRlbnQ6IHt9Ii5mb3JtYXQoZXZlbnQpKQ0KDQogICAgY29tbWVudCA9IGpzb24ubG9hZHMoZXZlbnQuYm9keS5kZWNvZGUoInV0Zi04IikpDQoNCiAgICAjIGNyZWF0ZSBuZXcgdG9waWMNCiAgICBpZiBjb21tZW50WyJjb21tZW50X2xpa2VzX2NvdW50Il0gPiAwOg0KICAgICAgICBjb250ZXh0LnByb2R1Y2VyLnNlbmQobGlrZWRfY29tbWVudF90b3BpYywgdmFsdWU9Y29tbWVudCkNCg0KICAgICMgZmluZCBpZiB0aGUgY29tbWVudCBoYXMgY29tbW9uIHdvcmRzDQogICAgaWYgZmluZF9rZXlfd29yZHMoY29tbWVudFsiY29tbWVudF90ZXh0Il0pOg0KICAgICAgICBjb250ZXh0LnByb2R1Y2VyLnNlbmQoY29tbW9uX3dvcmRzX3RvcGljLCB2YWx1ZT1jb21tZW50KQ0KDQogICAgIyBzZW5kIGRhdGEgdG8gZG93bmxvYWQgdGhlIHRodW1ibmFpbA0KICAgIGNvbnRleHQucHJvZHVjZXIuc2VuZCh0aHVtYm5haWxfdG9waWMsIHZhbHVlPWNvbW1lbnQpDQo=
+    commands:
+      - 'pip install kafka-python'
+    runtimeAttributes:
+      repositories: []
+    codeEntryType: sourceCode
+    timestamp: 1697184247
+  loggerSinks:
+    - level: debug
+  platform: {}
+  securityContext: {}
+  eventTimeout: ""

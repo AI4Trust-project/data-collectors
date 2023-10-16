@@ -96,10 +96,41 @@ Go on https://console.cloud.google.com/ create a project and create a Youtube AP
 ```
 youtube_collector/youtube_collector.yaml
 ```
-After the installation of the requirements simply deploy with the script:
+
+Create the Kafka secret:
 
 ```bash
-bash build_and_deploy.sh
+kubectl apply -f secrets/kafka_credentials.yaml
+```
+
+Acess the Nuclio dashboard (http://192.168.49.2:30050) and deploy in the default project the yamls files:
+
+```
+kafka/dynamic_router/dynamic-router.yaml
+kafka/hate_speech_detector/hatespeechdetector.yaml
+kafka/sink/sink.yaml
+kafka/thumbnail_downloader/thumbnail-downloader.yaml
+kafka/unifier/unifier.yaml
+```
+
+Your Nuclio dashboard should look like this:
+
+![Nuclio](../imgs/nuclio_dashboard.png)
+
+Deploy the Data consumer service
+
+```bash
+cd data_consumer
+minikube image build -t consumer:latest .
+kubectl apply -f data_consumer.yaml
+```
+
+Deploy Youtube Collector:
+
+```bash
+cd youtube_collector
+minikube image build -t collector:latest .
+kubectl apply -f youtube_collector.yaml
 ```
 
 # References

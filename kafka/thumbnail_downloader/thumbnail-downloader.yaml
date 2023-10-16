@@ -2,24 +2,36 @@ metadata:
   name: thumbnail-downloader
   labels:
     nuclio.io/project-name: default
-  resourceVersion: "56887"
+  resourceVersion: "116425"
 spec:
   handler: "main:handler"
   runtime: "python:3.9"
   env:
     - name: KAFKA_BROKER
-      value: "my-cluster-kafka-brokers.kafka:9092"
+      valueFrom:
+        secretKeyRef:
+          name: kafkacredentials
+          key: broker_url
     - name: MINIO_HOME
-      value: a
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: miniohome
     - name: MINIO_ACCESS_KEY
-      value: b
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: accesskey
     - name: MINIO_SECRET_KEY
-      value: c
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: secretkey
   resources:
     requests:
       cpu: 25m
       memory: 1Mi
-  imageHash: "1697119175011199544"
+  imageHash: "1697185401310765499"
   triggers:
     default-http:
       class: ""
@@ -61,7 +73,7 @@ spec:
     runtimeAttributes:
       repositories: []
     codeEntryType: sourceCode
-    timestamp: 1697119290
+    timestamp: 1697185546
   loggerSinks:
     - level: debug
   platform: {}

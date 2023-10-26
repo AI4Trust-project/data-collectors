@@ -237,3 +237,4 @@ pyrightconfig.json
 # remove playground
 playground/
 schema/
+data/

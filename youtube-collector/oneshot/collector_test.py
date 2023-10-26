@@ -13,6 +13,8 @@ youtube = build("youtube", "v3", developerKey=api_key)
 
 keywords_file = "keywords.txt"
 
+datafolder = "data"
+
 def sleep_until_midnight_pacific_time():
     """Sleeps until midnight Pacific Time."""
 
@@ -45,11 +47,20 @@ for i in trange(len(keywords)):
     print(keyword)
     try:
         search_info = {
+            "part": ["snippet", "id"],
             "q": keyword,
-            "page": 0,
+            "maxResults": 50,
             "order": "relevance",
+            "safeSearch": "none",
             "relevanceLanguage": "en",
+            "type": "video",
+            "regionCode": "gb",
+            "pages": 0,
         }
+
+        # create folder
+        keyword_folder = os.path.join(datafolder, keyword)
+        os.makedirs(keyword_folder)
 
         nxPage = ""
 
@@ -59,14 +70,14 @@ for i in trange(len(keywords)):
             videos_response = (
                 youtube.search()
                 .list(
-                    part=["snippet", "id"],
+                    part=search_info["part"],
                     q=search_info["q"],
-                    maxResults=50,
+                    maxResults=search_info["maxResults"],
                     order=search_info["order"],
-                    safeSearch="none",
+                    safeSearch=search_info["safeSearch"],
                     relevanceLanguage=search_info["relevanceLanguage"],
-                    type="video",
-                    regionCode="it",
+                    type=search_info["type"],
+                    regionCode=search_info["regionCode"],
                 )
                 .execute()
             )
@@ -75,14 +86,17 @@ for i in trange(len(keywords)):
             keywords.append(keyword)
             with open(keywords_file, "w") as file:
                 file.write(",".join(keywords))
-            exit()
+            if "quotaExceeded" in str(e):
+                now = datetime.datetime.now()
+                print(now)
+                print("API quota has been reached.")
+                exit()
+            
 
         if videos_response != "":
-            videos_response["search_info"] = search_info
-
             # dump
-
-            with open("data/{}.json".format(keyword), "w", encoding="utf-8") as f:
+            file_name = os.path.join(keyword_folder, "page-000.json")
+            with open(file_name, "w", encoding="utf-8") as f:
                 json.dump(videos_response, f, ensure_ascii=False, indent=4)
 
             resuts_per_page = int(videos_response["pageInfo"]["resultsPerPage"])
@@ -91,21 +105,21 @@ for i in trange(len(keywords)):
                 nxPage = videos_response["nextPageToken"]
 
         while nxPage != "":
-            search_info["page"] += 1
+            search_info["pages"] += 1
             videos_response = ""
 
             try:
                 videos_response = (
                     youtube.search()
                     .list(
-                        part=["snippet", "id"],
+                        part=search_info["part"],
                         q=search_info["q"],
-                        maxResults=50,
+                        maxResults=search_info["maxResults"],
                         order=search_info["order"],
-                        safeSearch="none",
+                        safeSearch=search_info["safeSearch"],
                         relevanceLanguage=search_info["relevanceLanguage"],
-                        type="video",
-                        regionCode="it",
+                        type=search_info["type"],
+                        regionCode=search_info["regionCode"],
                         pageToken=nxPage,
                     )
                     .execute()
@@ -115,16 +129,18 @@ for i in trange(len(keywords)):
                     now = datetime.datetime.now()
                     print(now)
                     print("API quota has been reached.")
+                    keywords.append(keyword)
+                    with open(keywords_file, "w") as file:
+                        file.write(",".join(keywords))
                     exit()
                 else:
                     print("Error getting page: {}".format(e))
                     nxPage = ""
 
             if videos_response != "":
-                videos_response["search_info"] = search_info
 
-                with open("data/{}.json".format(keyword), "a", encoding="utf-8") as f:
-                    f.write("\n")
+                file_name = os.path.join(keyword_folder, "page-{:03d}.json".format(search_info["pages"]))
+                with open(file_name, "w", encoding="utf-8") as f:
                     json.dump(videos_response, f, ensure_ascii=False, indent=4)
 
                 if "nextPageToken" in videos_response.keys():
@@ -135,6 +151,12 @@ for i in trange(len(keywords)):
         # update keywords
         with open(keywords_file, "w") as file:
             file.write(",".join(keywords))
+
+        # create meta
+        meta_file = os.path.join(keyword_folder, "meta.json")
+        search_info["pages"] += 1
+        with open(meta_file, "w", encoding="utf-8") as f:
+            json.dump(search_info, f, ensure_ascii=False, indent=4)
 
     except Exception as e:
         print("Error:", e)

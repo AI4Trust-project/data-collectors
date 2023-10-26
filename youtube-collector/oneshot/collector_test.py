@@ -2,16 +2,30 @@ import json
 import os
 import time
 import datetime
+import pytz
 
 from googleapiclient.discovery import build
-from requests import HTTPError
-from tqdm import tqdm, trange
+from tqdm import trange
 
 api_key = os.environ.get("YOUTUBE_API_KEY")
 
 youtube = build("youtube", "v3", developerKey=api_key)
 
 keywords_file = "keywords.txt"
+
+def sleep_until_midnight_pacific_time():
+    """Sleeps until midnight Pacific Time."""
+
+    # Get the current time in Pacific Time.
+    pacific_time = datetime.datetime.now(pytz.timezone('US/Pacific'))
+
+    # Calculate the next midnight in Pacific Time.
+    next_midnight_pacific_time = pacific_time.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+
+    # Sleep until the next midnight in Pacific Time.
+    time_to_sleep = next_midnight_pacific_time - pacific_time
+    time_to_sleep_in_seconds = time_to_sleep.total_seconds()
+    time.sleep(time_to_sleep_in_seconds)
 
 keywords = []
 
@@ -52,25 +66,16 @@ for i in trange(len(keywords)):
                     safeSearch="none",
                     relevanceLanguage=search_info["relevanceLanguage"],
                     type="video",
-                    regionCode="us",
+                    regionCode="it",
                 )
                 .execute()
             )
-        except HTTPError as e:
-            if e.resp.status == 403 and e.resp.content.decode("utf-8").startswith(
-                "User Rate Limit Exceeded"
-            ):
-                now = datetime.datetime.now()
-                print(now)
-                print("API quota has been reached.")
-                time.sleep(86400)
-
-            else:
-                print(e)
-                keywords.append(keyword)
-                with open(keywords_file, "w") as file:
-                    file.write(",".join(keywords))
-                continue
+        except Exception as e:
+            print("Error searching: {}".format(e))
+            keywords.append(keyword)
+            with open(keywords_file, "w") as file:
+                file.write(",".join(keywords))
+            exit()
 
         if videos_response != "":
             videos_response["search_info"] = search_info
@@ -100,21 +105,19 @@ for i in trange(len(keywords)):
                         safeSearch="none",
                         relevanceLanguage=search_info["relevanceLanguage"],
                         type="video",
-                        regionCode="us",
+                        regionCode="it",
                         pageToken=nxPage,
                     )
                     .execute()
                 )
-            except HTTPError as e:
-                if e.resp.status == 403 and e.resp.content.decode("utf-8").startswith(
-                    "User Rate Limit Exceeded"
-                ):
+            except Exception as e:
+                if "quotaExceeded" in str(e):
                     now = datetime.datetime.now()
                     print(now)
                     print("API quota has been reached.")
-                    time.sleep(86400)
+                    exit()
                 else:
-                    print(e)
+                    print("Error getting page: {}".format(e))
                     nxPage = ""
 
             if videos_response != "":

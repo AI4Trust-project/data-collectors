@@ -44,13 +44,14 @@ with open(keywords_file, "r") as file:
 
 for i in trange(len(keywords)):
     keyword = keywords.pop(0)
+    keyword = keyword.lower()
     print(keyword)
     try:
         search_info = {
             "part": ["snippet", "id"],
             "q": keyword,
             "maxResults": 50,
-            "order": "relevance",
+            "order": "viewCount",
             "safeSearch": "none",
             "relevanceLanguage": "en",
             "type": "video",

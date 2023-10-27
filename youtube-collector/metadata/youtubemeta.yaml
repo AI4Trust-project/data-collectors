@@ -1,0 +1,86 @@
+metadata:
+  name: youtubemeta
+  labels:
+    nuclio.io/project-name: default
+  resourceVersion: "297298"
+spec:
+  handler: "main:handler"
+  runtime: "python:3.9"
+  env:
+    - name: KAFKA_BROKER
+      valueFrom:
+        secretKeyRef:
+          name: kafkacredentials
+          key: broker_url
+    - name: MINIO_HOME
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: miniohome
+    - name: MINIO_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: accesskey
+    - name: MINIO_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: miniocredentials
+          key: secretkey
+    - name: YOUTUBE_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: youtubecredentials
+          key: apikey
+  resources:
+    requests:
+      cpu: 25m
+      memory: 1Mi
+  imageHash: "1698406002107949920"
+  triggers:
+    default-http:
+      class: ""
+      kind: http
+      name: default-http
+      maxWorkers: 1
+      attributes:
+        serviceType: ClusterIP
+    kafka-trigger:
+      class: ""
+      kind: kafka-cluster
+      name: kafka-trigger
+      maxWorkers: 1
+      explicitAckMode: disable
+      workerTerminationTimeout: 5s
+      attributes:
+        brokers:
+          - 'my-cluster-kafka-brokers.kafka:9092'
+        consumerGroup: group1
+        fetchDefault: 1048576
+        heartbeatInterval: 3s
+        initialOffset: latest
+        maxWaitHandlerDuringRebalance: 5s
+        rebalanceTimeout: 60s
+        sasl:
+          enable: false
+          password: ""
+          user: ""
+        sessionTimeout: 10s
+        topics:
+          - youtube-metadata
+        workerAllocationMode: pool
+  version: 1
+  alias: latest
+  build:
+    functionSourceCode: aW1wb3J0IGpzb24NCmltcG9ydCBvcw0KDQpmcm9tIG1pbmlvIGltcG9ydCBNaW5pbw0KZnJvbSBrYWZrYSBpbXBvcnQgS2Fma2FQcm9kdWNlcg0KZnJvbSBnb29nbGVhcGljbGllbnQuZGlzY292ZXJ5IGltcG9ydCBidWlsZA0KDQoNCmRlZiBpbml0X2NvbnRleHQoY29udGV4dCk6DQogICAgY2xpZW50ID0gTWluaW8oDQogICAgICAgIG9zLmVudmlyb24uZ2V0KCJNSU5JT19IT01FIiksDQogICAgICAgIGFjY2Vzc19rZXk9b3MuZW52aXJvbi5nZXQoIk1JTklPX0FDQ0VTU19LRVkiKSwNCiAgICAgICAgc2VjcmV0X2tleT1vcy5lbnZpcm9uLmdldCgiTUlOSU9fU0VDUkVUX0tFWSIpLA0KICAgICAgICBzZWN1cmU9RmFsc2UsDQogICAgKQ0KDQogICAgcHJvZHVjZXIgPSBLYWZrYVByb2R1Y2VyKA0KICAgICAgICBib290c3RyYXBfc2VydmVycz1bb3MuZW52aXJvbi5nZXQoIktBRktBX0JST0tFUiIpXSwNCiAgICAgICAgdmFsdWVfc2VyaWFsaXplcj1sYW1iZGEgeDoganNvbi5kdW1wcyh4KS5lbmNvZGUoInV0Zi04IiksDQogICAgKQ0KDQogICAgYXBpX2tleSA9IG9zLmVudmlyb24uZ2V0KCJZT1VUVUJFX0FQSV9LRVkiKQ0KICAgIHlvdXR1YmUgPSBidWlsZCgieW91dHViZSIsICJ2MyIsIGRldmVsb3BlcktleT1hcGlfa2V5KQ0KDQogICAgc2V0YXR0cihjb250ZXh0LCAicHJvZHVjZXIiLCBwcm9kdWNlcikNCiAgICBzZXRhdHRyKGNvbnRleHQsICJjbGllbnQiLCBjbGllbnQpDQogICAgc2V0YXR0cihjb250ZXh0LCAieW91dHViZSIsIHlvdXR1YmUpDQoNCg0KZGVmIGdlbmVyYXRlX2ZvbGRlcih2aWRlb19pZCk6DQogICAgZm9sZGVyX25hbWUgPSBbXQ0KICAgICMgY291bnQgMiBjYXJhY3RlcnMgdG8gY3JlYXRlIHN1YmZvbGRlcg0KICAgIGZvciBpIGluIHJhbmdlKDAsIGxlbih2aWRlb19pZCksIDIpOg0KICAgICAgICAjIENoZWNrIGlmIHRoZSByZW1haW5pbmcgY2hhcmFjdGVycyBhcmUgbGVzcyB0aGFuIDINCiAgICAgICAgaWYgaSArIDEgPT0gbGVuKHZpZGVvX2lkKToNCiAgICAgICAgICAgICMgUmVhZCBvbmx5IHRoZSBsYXN0IGNoYXJhY3Rlcg0KICAgICAgICAgICAgY2hhciA9IHZpZGVvX2lkW2ldDQogICAgICAgIGVsc2U6DQogICAgICAgICAgICAjIFJlYWQgMiBjaGFyYWN0ZXJzIGF0IGEgdGltZQ0KICAgICAgICAgICAgY2hhciA9IHZpZGVvX2lkW2kgOiBpICsgMl0NCg0KICAgICAgICBmb2xkZXJfbmFtZS5hcHBlbmQoY2hhcikNCg0KICAgIHJldHVybiAiLyIuam9pbihmb2xkZXJfbmFtZSkNCg0KDQpkZWYgaGFuZGxlcihjb250ZXh0LCBldmVudCk6DQoNCiAgICBwcmludChldmVudCkNCiAgICB2aWRlb19pZCA9IGV2ZW50LmJvZHkuZGVjb2RlKCJ1dGYtOCIpDQoNCiAgICB0cnk6DQogICAgICAgIHZpZGVvc19yZXNwb25zZSA9ICgNCiAgICAgICAgICAgIGNvbnRleHQueW91dHViZS52aWRlb3MoKQ0KICAgICAgICAgICAgLmxpc3QoDQogICAgICAgICAgICAgICAgcGFydD1bDQogICAgICAgICAgICAgICAgICAgICJjb250ZW50RGV0YWlscyIsDQogICAgICAgICAgICAgICAgICAgICJpZCIsDQogICAgICAgICAgICAgICAgICAgICJsaXZlU3RyZWFtaW5nRGV0YWlscyIsDQogICAgICAgICAgICAgICAgICAgICJsb2NhbGl6YXRpb25zIiwNCiAgICAgICAgICAgICAgICAgICAgInBsYXllciIsDQogICAgICAgICAgICAgICAgICAgICJyZWNvcmRpbmdEZXRhaWxzIiwNCiAgICAgICAgICAgICAgICAgICAgInNuaXBwZXQiLA0KICAgICAgICAgICAgICAgICAgICAic3RhdGlzdGljcyIsDQogICAgICAgICAgICAgICAgICAgICJzdGF0dXMiLA0KICAgICAgICAgICAgICAgICAgICAidG9waWNEZXRhaWxzIiwNCiAgICAgICAgICAgICAgICBdLA0KICAgICAgICAgICAgICAgIGlkPXZpZGVvX2lkLA0KICAgICAgICAgICAgKQ0KICAgICAgICAgICAgLmV4ZWN1dGUoKQ0KICAgICAgICApDQoNCiAgICAgICAgd2l0aCBvcGVuKCJ7fS5qc29uIi5mb3JtYXQoIm1ldGEiKSwgInciLCBlbmNvZGluZz0idXRmLTgiKSBhcyBmOg0KICAgICAgICAgICAganNvbi5kdW1wKHZpZGVvc19yZXNwb25zZSwgZiwgZW5zdXJlX2FzY2lpPUZhbHNlLCBpbmRlbnQ9NCkNCg0KICAgICAgICAjIFVwbG9hZCB0aGUgSlNPTiBmaWxlIHRvIE1pbmlvIGluIGEgc3RyZWFtaW5nIGZhc2hpb24uDQogICAgICAgIG9iamVjdF9uYW1lID0gInt9L3t9Ii5mb3JtYXQoZ2VuZXJhdGVfZm9sZGVyKHZpZGVvX2lkKSwgIm1ldGEuanNvbiIpDQogICAgICAgIGNvbnRleHQuY2xpZW50LmZwdXRfb2JqZWN0KA0KICAgICAgICAgICAgInZpZGVvcyIsIG9iamVjdF9uYW1lLCAibWV0YS5qc29uIiwgY29udGVudF90eXBlPSJhcHBsaWNhdGlvbi9qc29uIg0KICAgICAgICApDQoNCiAgICAgICAgb3MucmVtb3ZlKCJtZXRhLmpzb24iKQ0KDQoNCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6DQogICAgICAgIHByaW50KGUp
+    commands:
+      - 'pip install kafka-python minio google-api-python-client'
+    runtimeAttributes:
+      repositories: []
+    codeEntryType: sourceCode
+    timestamp: 1698406097
+  loggerSinks:
+    - level: debug
+  platform: {}
+  securityContext: {}
+  eventTimeout: ""

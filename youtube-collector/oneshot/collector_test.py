@@ -1,9 +1,9 @@
+import datetime
 import json
 import os
 import time
-import datetime
-import pytz
 
+import pytz
 from googleapiclient.discovery import build
 from tqdm import trange
 
@@ -15,19 +15,23 @@ keywords_file = "keywords.txt"
 
 datafolder = "data"
 
+
 def sleep_until_midnight_pacific_time():
     """Sleeps until midnight Pacific Time."""
 
     # Get the current time in Pacific Time.
-    pacific_time = datetime.datetime.now(pytz.timezone('US/Pacific'))
+    pacific_time = datetime.datetime.now(pytz.timezone("US/Pacific"))
 
     # Calculate the next midnight in Pacific Time.
-    next_midnight_pacific_time = pacific_time.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+    next_midnight_pacific_time = pacific_time.replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) + datetime.timedelta(days=1)
 
     # Sleep until the next midnight in Pacific Time.
     time_to_sleep = next_midnight_pacific_time - pacific_time
     time_to_sleep_in_seconds = time_to_sleep.total_seconds()
     time.sleep(time_to_sleep_in_seconds)
+
 
 keywords = []
 
@@ -46,7 +50,17 @@ for i in trange(len(keywords)):
     keyword = keywords.pop(0)
     keyword = keyword.lower()
     print(keyword)
+
+    nxPage = "start"
+
     try:
+        # create folder
+        keyword_folder = os.path.join(datafolder, keyword)
+
+        isExists = os.path.exists(keyword_folder)
+        if not isExists:
+            os.makedirs(keyword_folder)
+
         search_info = {
             "part": ["snippet", "id"],
             "q": keyword,
@@ -59,57 +73,25 @@ for i in trange(len(keywords)):
             "pages": 0,
         }
 
-        # create folder
-        keyword_folder = os.path.join(datafolder, keyword)
-        os.makedirs(keyword_folder)
-
-        nxPage = ""
-
-        videos_response = ""
-
-        try:
-            videos_response = (
-                youtube.search()
-                .list(
-                    part=search_info["part"],
-                    q=search_info["q"],
-                    maxResults=search_info["maxResults"],
-                    order=search_info["order"],
-                    safeSearch=search_info["safeSearch"],
-                    relevanceLanguage=search_info["relevanceLanguage"],
-                    type=search_info["type"],
-                    regionCode=search_info["regionCode"],
-                )
-                .execute()
-            )
-        except Exception as e:
-            print("Error searching: {}".format(e))
-            keywords.append(keyword)
-            with open(keywords_file, "w") as file:
-                file.write(",".join(keywords))
-            if "quotaExceeded" in str(e):
-                now = datetime.datetime.now()
-                print(now)
-                print("API quota has been reached.")
-                exit()
-            
-
-        if videos_response != "":
-            # dump
-            file_name = os.path.join(keyword_folder, "page-000.json")
-            with open(file_name, "w", encoding="utf-8") as f:
-                json.dump(videos_response, f, ensure_ascii=False, indent=4)
-
-            resuts_per_page = int(videos_response["pageInfo"]["resultsPerPage"])
-
-            if "nextPageToken" in videos_response.keys():
-                nxPage = videos_response["nextPageToken"]
-
         while nxPage != "":
-            search_info["pages"] += 1
-            videos_response = ""
+            videos_response = {}
 
-            try:
+            if nxPage == "start":
+                videos_response = (
+                    youtube.search()
+                    .list(
+                        part=search_info["part"],
+                        q=search_info["q"],
+                        maxResults=search_info["maxResults"],
+                        order=search_info["order"],
+                        safeSearch=search_info["safeSearch"],
+                        relevanceLanguage=search_info["relevanceLanguage"],
+                        type=search_info["type"],
+                        regionCode=search_info["regionCode"],
+                    )
+                    .execute()
+                )
+            else:
                 videos_response = (
                     youtube.search()
                     .list(
@@ -125,29 +107,18 @@ for i in trange(len(keywords)):
                     )
                     .execute()
                 )
-            except Exception as e:
-                if "quotaExceeded" in str(e):
-                    now = datetime.datetime.now()
-                    print(now)
-                    print("API quota has been reached.")
-                    keywords.append(keyword)
-                    with open(keywords_file, "w") as file:
-                        file.write(",".join(keywords))
-                    exit()
-                else:
-                    print("Error getting page: {}".format(e))
-                    nxPage = ""
 
-            if videos_response != "":
+            Fname = "page-{:03d}.json".format(search_info["pages"])
+            file_name = os.path.join(keyword_folder, Fname)
 
-                file_name = os.path.join(keyword_folder, "page-{:03d}.json".format(search_info["pages"]))
-                with open(file_name, "w", encoding="utf-8") as f:
-                    json.dump(videos_response, f, ensure_ascii=False, indent=4)
+            with open(file_name, "w", encoding="utf-8") as f:
+                json.dump(videos_response, f, ensure_ascii=False, indent=4)
 
-                if "nextPageToken" in videos_response.keys():
-                    nxPage = videos_response["nextPageToken"]
-                else:
-                    nxPage = ""
+            if "nextPageToken" in videos_response.keys():
+                nxPage = videos_response["nextPageToken"]
+                search_info["pages"] += 1
+            else:
+                nxPage = ""
 
         # update keywords
         with open(keywords_file, "w") as file:
@@ -160,8 +131,14 @@ for i in trange(len(keywords)):
             json.dump(search_info, f, ensure_ascii=False, indent=4)
 
     except Exception as e:
-        print("Error:", e)
+        print("Error searching: {}".format(e))
         keywords.append(keyword)
         with open(keywords_file, "w") as file:
             file.write(",".join(keywords))
-        continue
+        if "quotaExceeded" in str(e):
+            now = datetime.datetime.now()
+            print(now)
+            print("API quota has been reached.")
+            exit()
+        else:
+            continue

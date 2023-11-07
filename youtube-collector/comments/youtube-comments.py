@@ -28,8 +28,8 @@ def init_context(context):
     setattr(context, "youtube", youtube)
 
 
-def generate_folder(video_id):
-    folder_name = []
+def generate_folder(video_id, keyword):
+    folder_name = ["videos", keyword]
     # count 2 caracters to create subfolder
     for i in range(0, len(video_id), 2):
         # Check if the remaining characters are less than 2
@@ -47,7 +47,10 @@ def generate_folder(video_id):
 
 def handler(context, event):
     print(event)
-    video_id = event.body.decode("utf-8")
+
+    data = json.loads(event.body.decode("utf-8"))
+    video_id = data["video_id"]
+    keyword = data["keyword"]
 
     search_info = {
         "part": ["id", "snippet", "replies"],
@@ -93,7 +96,7 @@ def handler(context, event):
             with open(file_name, "w", encoding="utf-8") as f:
                 json.dump(comment_threads, f, ensure_ascii=False, indent=4)
 
-            object_name = "{}/{}/{}".format(generate_folder(video_id), "comments", file_name)
+            object_name = "{}/{}/{}".format(generate_folder(video_id, keyword), "comments", file_name)
             context.client.fput_object(
                 "videos", object_name, file_name, content_type="application/json"
             )
@@ -118,7 +121,7 @@ def handler(context, event):
         with open(meta_file, "w", encoding="utf-8") as f:
             json.dump(search_info, f, ensure_ascii=False, indent=4)
 
-        object_name = "{}/{}/{}".format(generate_folder(video_id), "comments", meta_file)
+        object_name = "{}/{}/{}".format(generate_folder(video_id, keyword), "comments", meta_file)
         context.client.fput_object(
             "videos", object_name, meta_file, content_type="application/json"
         )

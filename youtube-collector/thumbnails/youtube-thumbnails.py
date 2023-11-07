@@ -23,8 +23,8 @@ def init_context(context):
     setattr(context, "client", client)
 
 
-def generate_folder(video_id):
-    folder_name = []
+def generate_folder(video_id, keyword):
+    folder_name = ["videos", keyword]
     # count 2 caracters to create subfolder
     for i in range(0, len(video_id), 2):
         # Check if the remaining characters are less than 2
@@ -41,7 +41,9 @@ def generate_folder(video_id):
 
 
 def handler(context, event):
-    video_id = event.body.decode("utf-8")
+    data = json.loads(event.body.decode("utf-8"))
+    video_id = data["video_id"]
+    keyword = data["keyword"]
     bucket = "videos"
 
     thumb_types = [
@@ -57,7 +59,7 @@ def handler(context, event):
         try:
             image_url = f"https://img.youtube.com/vi/{video_id}/{image_types}.jpg"
             image_name = "{}/{}/{}.jpg".format(
-                generate_folder(video_id), "thumbnails", image_types
+                generate_folder(video_id, keyword), "thumbnails", image_types
             )
             image_file = urllib.request.urlopen(image_url)
 

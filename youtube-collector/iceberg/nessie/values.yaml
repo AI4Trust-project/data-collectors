@@ -1,0 +1,7 @@
+versionStoreType: JDBC
+postgres:
+  jdbcUrl: jdbc:postgresql://mlrun-postgres-cluster.digitalhub:5432/nessie
+  secret:
+    name: postgres-creds
+    username: postgres_username
+    password: postgres_password

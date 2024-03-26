@@ -124,7 +124,7 @@ def insert_comments(video_response, query_uuid, keyword):
     return data
 
 
-def insert_query_table(date, query_uuid, video_id, keyword, search_info, token):
+def insert_query_table(date, query_uuid, video_id, keyword, search_info):
 
     row = {
         "table": "youtube-query",
@@ -137,7 +137,6 @@ def insert_query_table(date, query_uuid, video_id, keyword, search_info, token):
         "textFormat": search_info["textFormat"],
         "maxResults": search_info["maxResults"],
         "order": search_info["order"],
-        "pageToken": token,
     }
 
     m = json.loads(json.dumps(row))
@@ -177,6 +176,7 @@ def handler(context, event):
     }
 
     nxPage = "start"
+    query_uuid = str(uuid.uuid4())
     # iterate in the comment pages
 
     response = False
@@ -225,13 +225,12 @@ def handler(context, event):
             date = (
                 datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             )
-            query_uuid = str(uuid.uuid4())
 
-            q = insert_query_table(
-                date, query_uuid, video_id, keyword, search_info, nxPage
-            )
-            m = json.loads(json.dumps(q))
-            context.producer.send("collected_comments", value=m)
+            if nxPage == "start":
+
+                q = insert_query_table(date, query_uuid, video_id, keyword, search_info)
+                m = json.loads(json.dumps(q))
+                context.producer.send("collected_comments", value=m)
 
             # insert comments in the database
             comments = insert_comments(

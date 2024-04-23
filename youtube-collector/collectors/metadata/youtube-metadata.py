@@ -47,7 +47,7 @@ def generate_folder(video_id, keyword, bucket_name):
     return "/".join(folder_name)
 
 
-def wait_unti_midnight():
+def wait_until_midnight():
     # Get the current time in PDT
     now = datetime.now(timezone(timedelta(hours=-7)))
 
@@ -78,6 +78,15 @@ def handler(context, event):
     bucket_name = "youtube-artifacts"
 
     response = False
+
+    # test minio
+    try:
+        if not context.client.bucket_exists(bucket_name):
+            print("YT METADATA: Object storage connected")
+    except Exception as e:
+        context.producer.send("youtube", value=data)
+        print("YT METADATA: MINIO NOT REACHABLE")
+        wait_until_midnight()
 
     try:
         videos_response = (
@@ -118,7 +127,7 @@ def handler(context, event):
     except Exception as e:
         print(e)
         if "quota" in str(e).lower():
-            wait_unti_midnight()
+            wait_until_midnight()
 
     if response:
 

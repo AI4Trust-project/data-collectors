@@ -1,0 +1,5 @@
+CREATE TABLE mergerqueue (
+  videoId VARCHAR(255) PRIMARY KEY,
+  type VARCHAR(255) NOT NULL,
+  data JSONB NOT NULL
+);

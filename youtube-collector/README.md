@@ -120,7 +120,7 @@ psql
 ```
 
 ```sql
-CREATE DATABASE nessie
+CREATE DATABASE nessie;
 ```
 
 Exit the shell line in the pod. Now we can proceed to install Nessie, first add the repository to helm:

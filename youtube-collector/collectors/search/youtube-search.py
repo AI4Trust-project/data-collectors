@@ -17,7 +17,6 @@ def init_context(context):
         os.environ.get("MINIO_HOME"),
         access_key=os.environ.get("MINIO_ACCESS_KEY"),
         secret_key=os.environ.get("MINIO_SECRET_KEY"),
-        secure=False
     )
 
     producer = KafkaProducer(
@@ -133,16 +132,17 @@ def insert_raw_data_minio(video_responses: list, path: str, bucket_name: str, co
     try:
         for i, response in zip(range(len(video_responses)), video_responses):
             Fname = "page-{:03d}.json".format(i)
-            with tempfile.NamedTemporaryFile() as tmp:
-                with open(tmp.name, "w") as f:
-                    json.dump(response, f, ensure_ascii=False, indent=4)
-                    object_name = "{}/{}".format(path, Fname)
-                    context.client.fput_object(
-                        bucket_name,
-                        object_name,
-                        tmp.name,
-                        content_type="application/json",
-                    )
+            tmp = tempfile.NamedTemporaryFile()
+            with open(tmp.name, "w") as f:
+                json.dump(response, f, ensure_ascii=False, indent=4)
+            object_name = "{}/{}".format(path, Fname)
+            context.client.fput_object(
+                bucket_name,
+                object_name,
+                tmp.name,
+                content_type="application/json",
+            )
+            tmp.close()
     except Exception as e:
         print("YT SEARCH: ERROR INSERTING FILES ON MINIO")
         print(e)
@@ -172,17 +172,18 @@ def produce_messages_for_collection(video_responses: list, search_info: dict, co
 
 def create_meta(search_info: dict, bucket_name: str, path: str, context):
     try:
-        meta_file = "meta.json"
-        with tempfile.NamedTemporaryFile() as tmp:
-            with open(tmp.name, 'w') as f:
-                json.dump(search_info, f, ensure_ascii=False, indent=4)
-                object_name = "{}/{}".format(path, meta_file)
-                context.client.fput_object(
-                    bucket_name, object_name, tmp.name, content_type="application/json"
-                )
-
+        tmp = tempfile.NamedTemporaryFile()
+        with open(tmp.name, "w") as f:
+            json.dump(search_info, f, ensure_ascii=False, indent=4)
+        object_name = "{}/{}".format(path, "meta.json")
+        context.client.fput_object(
+            bucket_name, object_name, tmp.name, content_type="application/json"
+        )
+        tmp.close()
     except Exception as e:
+        print("YT SEARCH ERROR INSERTING META.JSON")
         print(e)
+
 
 
 def get_keywords(context):

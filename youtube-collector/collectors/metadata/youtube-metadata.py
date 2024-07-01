@@ -1,9 +1,11 @@
 import json
 import os
+import tempfile
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import psycopg2
 from googleapiclient.discovery import build
 from minio import Minio
 
@@ -15,6 +17,7 @@ def init_context(context):
         os.environ.get("MINIO_HOME"),
         access_key=os.environ.get("MINIO_ACCESS_KEY"),
         secret_key=os.environ.get("MINIO_SECRET_KEY"),
+        secure=False,
     )
 
     producer = KafkaProducer(
@@ -25,9 +28,20 @@ def init_context(context):
     api_key = os.environ.get("YOUTUBE_API_KEY")
     youtube = build("youtube", "v3", developerKey=api_key)
 
+    dbname = os.environ.get("DATABASE_NAME")
+    user = os.environ.get("DATABASE_USER")
+    password = os.environ.get("DATABASE_PWD")
+    host = os.environ.get("DATABASE_HOST")
+    port = os.environ.get("DATABASE_PORT")
+
+    conn = psycopg2.connect(
+        dbname=dbname, user=user, password=password, host=host, port=port
+    )
+
     setattr(context, "producer", producer)
     setattr(context, "client", client)
     setattr(context, "youtube", youtube)
+    setattr(context, "conn", conn)
 
 
 def generate_folder(video_id, keyword, bucket_name):
@@ -69,11 +83,55 @@ def wait_until_midnight():
     time.sleep(wait_time)
 
 
+def insert_into_postgres(data: dict, conn):
+    cur = None
+    try:
+
+        cur = conn.cursor()
+
+        query = (
+            "INSERT INTO ytMetadata (dataOwner, collectionDate,"
+            " queryid, videoid, searchKeyword, resultsPath, keywordId,"
+            " producer) VALUES (%s, %s, %s, %s, %s, %s, %s, %s,)"
+        )
+        cur.execute(
+            query,
+            (
+                data["dataOwner"],
+                data["collectionDate"],
+                data["queryId"],
+                data["videoId"],
+                data["searchKeyword"],
+                data["resultsPath"],
+                data["keywordId"],
+                data["producer"],
+            ),
+        )
+
+        # commit the changes to the database
+        conn.commit()
+
+    except Exception as e:
+        print("ERROR INSERTING ytMetadata")
+        print(e)
+        cur.execute("ROLLBACK")
+        conn.commit()
+    finally:
+        cur.close()
+
+
 def handler(context, event):
 
     data = json.loads(event.body.decode("utf-8"))
-    video_id = data["video_id"]
-    keyword = data["keyword"]
+    video_id = data["videoId"]
+    keyword = data["searchKeyword"]
+    producer = data["producer"]
+
+    date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    query_uuid = str(uuid.uuid4())
+    # pass search uuid and use on the tables
+
+    dataOwner = "FBK-YOUTUBE"
 
     bucket_name = "youtube-artifacts"
 
@@ -109,18 +167,20 @@ def handler(context, event):
             .execute()
         )
 
-        with open("{}.json".format("meta"), "w", encoding="utf-8") as f:
+        tmp = tempfile.NamedTemporaryFile()
+        with open(tmp.name, "w", encoding="utf-8") as f:
+            videos_response["dataOwner"] = dataOwner
+            videos_response["createdAt"] = date
+            videos_response["queryId"] = query_uuid
+            videos_response["producer"] = producer
             json.dump(videos_response, f, ensure_ascii=False, indent=4)
-
-        # Upload the JSON file to Minio in a streaming fashion.
         object_name = "{}/{}".format(
             generate_folder(video_id, keyword, bucket_name), "meta.json"
         )
         context.client.fput_object(
-            bucket_name, object_name, "meta.json", content_type="application/json"
+            bucket_name, object_name, tmp.name, content_type="application/json"
         )
-
-        os.remove("meta.json")
+        tmp.close()
 
         response = True
 
@@ -133,50 +193,22 @@ def handler(context, event):
 
         # Create Iceberg tables
 
-        # Query table
-
-        date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        query_uuid = str(uuid.uuid4())
-
-        try:
-            row = {
-                "table": "youtube-query",
-                "collectionDate": date,
-                "queryId": query_uuid,
-                "videoId": video_id,
-                "searchKeyword": keyword,
-                "resource": "videos.list",
-                "part": [
-                    "contentDetails",
-                    "id",
-                    "liveStreamingDetails",
-                    "localizations",
-                    "player",
-                    "recordingDetails",
-                    "snippet",
-                    "statistics",
-                    "status",
-                    "topicDetails",
-                ],
-                "id": video_id,
-            }
-
-            m = json.loads(json.dumps(row))
-            context.producer.send("collected_metadata", value=m)
-        except Exception as e:
-            print("Error Query Table: {}".format(e))
-
         # Metada table
-
         try:
             row = {
-                "table": "youtube-video-metadata",
+                "dataOwner": dataOwner,
                 "collectionDate": date,
                 "queryId": query_uuid,
                 "videoId": video_id,
                 "searchKeyword": keyword,
-                "s3Location": generate_folder(video_id, keyword, bucket_name),
+                "resultsPath": generate_folder(video_id, keyword, bucket_name),
+                "keywordId": data["keywordId"],
+                "producer": data["producer"],
             }
+
+            insert_into_postgres(data=row, conn=context.conn)
+
+            row["table"] = "youtube-video-metadata"
 
             m = json.loads(json.dumps(row))
             context.producer.send("collected_metadata", value=m)
@@ -185,7 +217,6 @@ def handler(context, event):
             print("Error Metadata Table: {}".format(e))
 
         # parse response
-
         items = videos_response["items"][0]
 
         # Statistics table
@@ -195,7 +226,10 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-statistics",
+                "dataOwner": dataOwner,
+                "producer": data["producer"],
                 "collectionDate": date,
+                "keywordId": data["keywordId"],
                 "queryId": query_uuid,
                 "videoId": video_id,
                 "searchKeyword": keyword,
@@ -217,6 +251,9 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-snippet",
+                "dataOwner": dataOwner,
+                "producer": data["producer"],
+                "keywordId": data["keywordId"],
                 "collectionDate": date,
                 "queryId": query_uuid,
                 "videoId": video_id,
@@ -240,6 +277,9 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-topicDetails",
+                "dataOwner": dataOwner,
+                "producer": data["producer"],
+                "keywordId": data["keywordId"],
                 "collectionDate": date,
                 "queryId": query_uuid,
                 "videoId": video_id,
@@ -262,7 +302,10 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-contentDetails",
+                "dataOwner": dataOwner,
+                "producer": data["producer"],
                 "collectionDate": date,
+                "keywordId": data["keywordId"],
                 "queryId": query_uuid,
                 "videoId": video_id,
                 "searchKeyword": keyword,
@@ -283,7 +326,10 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-status",
+                "dataOwner": dataOwner,
+                "producer": data["producer"],
                 "collectionDate": date,
+                "keywordId": data["keywordId"],
                 "queryId": query_uuid,
                 "videoId": video_id,
                 "searchKeyword": keyword,

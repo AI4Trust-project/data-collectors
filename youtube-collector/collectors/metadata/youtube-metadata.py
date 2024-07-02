@@ -92,7 +92,7 @@ def insert_into_postgres(data: dict, conn):
         query = (
             "INSERT INTO ytMetadata (dataOwner, collectionDate,"
             " queryid, videoid, searchKeyword, resultsPath, keywordId,"
-            " producer) VALUES (%s, %s, %s, %s, %s, %s, %s, %s,)"
+            " producer) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         )
         cur.execute(
             query,

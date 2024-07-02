@@ -1,9 +1,11 @@
 import json
 import os
 import time
+import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import psycopg2
 from googleapiclient.discovery import build
 from minio import Minio
 
@@ -25,9 +27,20 @@ def init_context(context):
     api_key = os.environ.get("YOUTUBE_API_KEY")
     youtube = build("youtube", "v3", developerKey=api_key)
 
+    dbname = os.environ.get("DATABASE_NAME")
+    user = os.environ.get("DATABASE_USER")
+    password = os.environ.get("DATABASE_PWD")
+    host = os.environ.get("DATABASE_HOST")
+    port = os.environ.get("DATABASE_PORT")
+
+    conn = psycopg2.connect(
+        dbname=dbname, user=user, password=password, host=host, port=port
+    )
+
     setattr(context, "producer", producer)
     setattr(context, "client", client)
     setattr(context, "youtube", youtube)
+    setattr(context, "conn", conn)
 
 
 def generate_folder(video_id, keyword, bucket_name):
@@ -69,7 +82,7 @@ def wait_until_midnight():
     time.sleep(wait_time)
 
 
-def insert_comments(video_response, query_uuid, keyword):
+def insert_comments(video_response, search_info, file_name):
     date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     data = []
     if "items" in video_response.keys():
@@ -78,9 +91,13 @@ def insert_comments(video_response, query_uuid, keyword):
             try:
                 base_message = {
                     "table": "youtube-video-comment",
+                    "dataOwner": search_info["dataOwner"],
                     "collectionDate": date,
-                    "queryId": query_uuid,
-                    "searchKeyword": keyword,
+                    "queryId": search_info["queryId"],
+                    "searchKeyword": search_info["searchKeyword"],
+                    "resultsPath": file_name,
+                    "keywordId": data["keywordId"],
+                    "producer": data["producer"],
                 }
                 base_message["id"] = i["id"]
                 comment = i["snippet"]
@@ -105,9 +122,13 @@ def insert_comments(video_response, query_uuid, keyword):
                         # create base message
                         base_message = {
                             "table": "youtube-video-comment",
+                            "dataOwner": search_info["dataOwner"],
                             "collectionDate": date,
-                            "queryId": query_uuid,
-                            "searchKeyword": keyword,
+                            "queryId": search_info["queryId"],
+                            "searchKeyword": search_info["searchKeyword"],
+                            "resultsPath": file_name,
+                            "keywordId": data["keywordId"],
+                            "producer": data["producer"],
                         }
                         # add id
                         base_message["id"] = r["id"]
@@ -124,47 +145,61 @@ def insert_comments(video_response, query_uuid, keyword):
     return data
 
 
-def insert_query_table(date, query_uuid, video_id, keyword, search_info):
+def insert_into_postgres(data, conn):
+    cur = None
+    try:
 
-    row = {
-        "table": "youtube-query",
-        "collectionDate": date,
-        "queryId": query_uuid,
-        "videoId": video_id,
-        "searchKeyword": keyword,
-        "resource": "commentThreads.list",
-        "part": search_info["part"],
-        "textFormat": search_info["textFormat"],
-        "maxResults": search_info["maxResults"],
-        "order": search_info["order"],
-    }
+        cur = conn.cursor()
 
-    m = json.loads(json.dumps(row))
+        query = (
+            "INSERT INTO ytComments (dataOwner, collectionDate,"
+            " queryid, searchKeyword, resultsPath, keywordId,"
+            " producer, part_, videoid, textformat, maxresults,"
+            " order_, pages)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        )
+        cur.execute(
+            query,
+            (
+                data["dataOwner"],
+                data["collectionDate"],
+                data["queryId"],
+                data["searchKeyword"],
+                data["resultsPath"],
+                data["keywordId"],
+                data["producer"],
+                data["part"],
+                data["videoId"],
+                data["textFormat"],
+                data["maxResults"],
+                data["order"],
+                data["pages"],
+            ),
+        )
 
-    return m
+        # commit the changes to the database
+        conn.commit()
 
-
-def insert_files_table(date, query_uuid, video_id, keyword, location):
-    m = {
-        "table": "youtube-video-comments-files",
-        "collectionDate": date,
-        "queryId": query_uuid,
-        "videoId": video_id,
-        "searchKeyword": keyword,
-        "s3Location": location,
-    }
-
-    return m
+    except Exception as e:
+        print("ERROR INSERTING ytMetadata")
+        print(e)
+        cur.execute("ROLLBACK")
+        conn.commit()
+    finally:
+        cur.close()
 
 
 def handler(context, event):
     print(event)
 
     data = json.loads(event.body.decode("utf-8"))
-    video_id = data["video_id"]
-    keyword = data["keyword"]
+    video_id = data["videoId"]
+    keyword = data["searchKeyword"]
 
     bucket_name = "youtube-artifacts"
+    dataOwner = "FBK-YOUTUBE"
+    query_uuid = str(uuid.uuid4())
+    date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # test minio
     try:
@@ -176,6 +211,13 @@ def handler(context, event):
         wait_until_midnight()
 
     search_info = {
+        "dataOwner": dataOwner,
+        "collectionDate": date,
+        "queryId": query_uuid,
+        "searchKeyword": keyword,
+        "resultsPath": generate_folder(video_id, keyword, bucket_name),
+        "keywordId": data["keywordId"],
+        "producer": data["producer"],
         "part": ["id", "snippet", "replies"],
         "videoId": video_id,
         "textFormat": "plainText",
@@ -185,7 +227,6 @@ def handler(context, event):
     }
 
     nxPage = "start"
-    query_uuid = str(uuid.uuid4())
     # iterate in the comment pages
 
     response = False
@@ -218,49 +259,38 @@ def handler(context, event):
                     .execute()
                 )
 
-            file_name = "page-{:03d}.json".format(search_info["pages"])
+            # insert file in S3
 
-            with open(file_name, "w", encoding="utf-8") as f:
+            tmp = tempfile.NamedTemporaryFile()
+
+            with open(tmp.name, "w", encoding="utf-8") as f:
                 json.dump(comment_threads, f, ensure_ascii=False, indent=4)
-
+            file_name = "page-{:03d}.json".format(search_info["pages"])
             object_name = "{}/{}/{}".format(
                 generate_folder(video_id, keyword, bucket_name), "comments", file_name
             )
             context.client.fput_object(
-                bucket_name, object_name, file_name, content_type="application/json"
+                bucket_name, object_name, tmp.name, content_type="application/json"
             )
 
-            # insert query table
-            date = (
-                datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            )
+            tmp.close()
 
-            if nxPage == "start":
-
-                q = insert_query_table(date, query_uuid, video_id, keyword, search_info)
-                m = json.loads(json.dumps(q))
-                context.producer.send("collected_comments", value=m)
-
-            # insert comments in the database
+            # insert comments on iceberg
             comments = insert_comments(
-                video_response=comment_threads, query_uuid=query_uuid, keyword=keyword
+                video_response=comment_threads,
+                search_info=search_info,
+                file_name=object_name,
             )
             for c in comments:
                 m = json.loads(json.dumps(c))
                 context.producer.send("collected_comments", value=m)
-
-            # insert file table
-            q = insert_files_table(date, query_uuid, video_id, keyword, object_name)
-            m = json.loads(json.dumps(q))
-            context.producer.send("collected_comments", value=m)
-
-            os.remove(file_name)
 
             if "nextPageToken" in comment_threads.keys():
                 nxPage = comment_threads["nextPageToken"]
                 search_info["pages"] += 1
             else:
                 nxPage = ""
+                search_info["pages"] += 1
 
             response = True
 
@@ -271,24 +301,34 @@ def handler(context, event):
             if "quota" in str(e).lower():
                 wait_until_midnight()
 
-    # upload meta
+    # upload meta and insert postgres
 
     if response:
 
+        # insert data in postgres
+        insert_into_postgres(data=search_info, conn=context.conn)
+
+        # insert meta.json in S3
         try:
 
-            meta_file = "meta.json"
-            search_info["pages"] += 1
-            with open(meta_file, "w", encoding="utf-8") as f:
+            tmp = tempfile.NamedTemporaryFile()
+
+            with open(tmp.name, "w", encoding="utf-8") as f:
                 json.dump(search_info, f, ensure_ascii=False, indent=4)
 
             object_name = "{}/{}/{}".format(
-                generate_folder(video_id, keyword, bucket_name), "comments", meta_file
+                generate_folder(video_id, keyword, bucket_name), "comments", "meta.json"
             )
             context.client.fput_object(
-                bucket_name, object_name, meta_file, content_type="application/json"
+                bucket_name, object_name, tmp.name, content_type="application/json"
             )
-            os.remove(meta_file)
+            tmp.close()
 
         except Exception as e:
             print(e)
+
+        # insert into iceberg
+
+        search_info["table"] = "youtube-video-comments"
+        m = json.loads(json.dumps(search_info))
+        context.producer.send("collected_metadata", value=m)

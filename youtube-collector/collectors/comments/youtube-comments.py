@@ -215,7 +215,7 @@ def handler(context, event):
         "collectionDate": date,
         "queryId": query_uuid,
         "searchKeyword": keyword,
-        "resultsPath": generate_folder(video_id, keyword, bucket_name),
+        "resultsPath": generate_folder(video_id, keyword, bucket_name) + "/comments",
         "keywordId": data["keywordId"],
         "producer": data["producer"],
         "part": ["id", "snippet", "replies"],

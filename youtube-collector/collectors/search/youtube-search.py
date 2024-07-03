@@ -17,6 +17,7 @@ def init_context(context):
         os.environ.get("MINIO_HOME"),
         access_key=os.environ.get("MINIO_ACCESS_KEY"),
         secret_key=os.environ.get("MINIO_SECRET_KEY"),
+        secure=False,
     )
 
     producer = KafkaProducer(
@@ -183,7 +184,6 @@ def create_meta(search_info: dict, bucket_name: str, path: str, context):
     except Exception as e:
         print("YT SEARCH ERROR INSERTING META.JSON")
         print(e)
-
 
 
 def get_keywords(context):

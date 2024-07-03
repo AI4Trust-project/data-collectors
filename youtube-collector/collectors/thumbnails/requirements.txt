@@ -1,1 +1,1 @@
-pip install kafka-python minio
+pip install kafka-python psycopg2 minio

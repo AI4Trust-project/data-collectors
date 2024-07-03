@@ -86,7 +86,7 @@ def insert_into_postgres(data, conn):
         conn.commit()
 
     except Exception as e:
-        print("ERROR INSERTING ytSearch")
+        print("ERROR INSERTING ytThumb")
         print(e)
         cur.execute("ROLLBACK")
         conn.commit()

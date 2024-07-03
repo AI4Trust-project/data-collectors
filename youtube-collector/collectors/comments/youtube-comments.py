@@ -17,6 +17,7 @@ def init_context(context):
         os.environ.get("MINIO_HOME"),
         access_key=os.environ.get("MINIO_ACCESS_KEY"),
         secret_key=os.environ.get("MINIO_SECRET_KEY"),
+        secure=False,
     )
 
     producer = KafkaProducer(
@@ -139,7 +140,8 @@ def insert_comments(video_response, search_info, file_name):
                         # save reply
                         data.append(base_message)
             except Exception as e:
-                print(e)
+                # print("ERROR INSERT COMMENTS")
+                # print(e)
                 continue
 
     return data
@@ -203,7 +205,7 @@ def handler(context, event):
 
     # test minio
     try:
-        if not context.client.bucket_exists(bucket_name):
+        if context.client.bucket_exists(bucket_name):
             print("YT COMMENTS: Object storage connected")
     except Exception as e:
         context.producer.send("youtube", value=data)
@@ -297,6 +299,7 @@ def handler(context, event):
         except Exception as e:
             nxPage = ""
             response = False
+            print("Error handler")
             print(e)
             if "quota" in str(e).lower():
                 wait_until_midnight()
@@ -325,6 +328,7 @@ def handler(context, event):
             tmp.close()
 
         except Exception as e:
+            print("ERROR upload meta in s3")
             print(e)
 
         # insert into iceberg

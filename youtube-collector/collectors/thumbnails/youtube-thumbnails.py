@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import tempfile
 import urllib.request
 import uuid
 from datetime import datetime, timezone
@@ -110,6 +111,7 @@ def handler(context, event):
     #     "maxresdefault",
     # ]
     thumb_types = ["default"]
+    tmp = tempfile.NamedTemporaryFile()
 
     for image_types in thumb_types:
         try:
@@ -121,16 +123,20 @@ def handler(context, event):
             )
             image_file = urllib.request.urlopen(image_url)
 
-            # build SHA-1
-            h = hashlib.sha1(image_file.read()).hexdigest()
+            with open(tmp.name, "wb") as f:
+                f.write(image_file.read())
 
-            context.client.put_object(
+            h = ""
+            with open(tmp.name, "rb") as f:
+                # build SHA-1
+                h = hashlib.sha1(image_file.read()).hexdigest()
+
+            context.client.fput_object(
                 bucket_name,
                 image_name,
-                image_file,
-                length=int(image_file.headers["Content-Length"]),
+                tmp.name,
                 content_type="image/jpeg",
-                metadata={"sha1": h},
+                metadata={"sha1": str(h)},
             )
 
             image_file.close()
@@ -138,6 +144,8 @@ def handler(context, event):
         except Exception as e:
             print(e)
             continue
+
+    tmp.close()
 
     # add reference in iceberg with the hash
     date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

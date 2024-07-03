@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import tempfile
@@ -16,6 +17,7 @@ def init_context(context):
         os.environ.get("MINIO_HOME"),
         access_key=os.environ.get("MINIO_ACCESS_KEY"),
         secret_key=os.environ.get("MINIO_SECRET_KEY"),
+        secure=False
     )
 
     producer = KafkaProducer(
@@ -54,6 +56,7 @@ def generate_folder(video_id, keyword, bucket_name):
 
     return "/".join(folder_name)
 
+
 def insert_into_psql(data, conn):
     cur = None
     try:
@@ -61,8 +64,8 @@ def insert_into_psql(data, conn):
 
         query = (
             "INSERT INTO ytVideoFile (dataOwner, collectionDate,"
-            " queryId, searchKeyword, resultsPath, keywordId, producer)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s)"
+            " queryId, searchKeyword, resultsPath, keywordId, producer, hash_)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters
@@ -75,7 +78,8 @@ def insert_into_psql(data, conn):
                 data["searchKeyword"],
                 data["resultsPath"],
                 data["keywordId"],
-                data["producer"]
+                data["producer"],
+                data["hash"],
             ),
         )
 
@@ -83,12 +87,31 @@ def insert_into_psql(data, conn):
         conn.commit()
 
     except Exception as e:
-        print("ERROR INSERTING ytSearch")
+        print("ERROR INSERTING ytVideoFile")
         print(e)
         cur.execute("ROLLBACK")
         conn.commit()
     finally:
         cur.close()
+
+
+def file_hash(file_path):
+    h = ""
+    try:
+        sha1 = hashlib.sha1()
+
+        with open(file_path, "rb") as f:
+            while True:
+                data = f.read(65536)  # arbitrary number to reduce RAM usage
+                if not data:
+                    break
+                sha1.update(data)
+        h = sha1.hexdigest()
+
+    except Exception as e:
+        print(e)
+
+    return h
 
 
 def handler(context, event):
@@ -115,8 +138,14 @@ def handler(context, event):
             generate_folder(video_id, keyword, bucket_name), file_name
         )
 
+        h = file_hash(tmp.name)
+
         context.client.fput_object(
-            bucket_name, object_name, tmp.name, content_type="application/mp4"
+            bucket_name,
+            object_name,
+            tmp.name,
+            content_type="application/mp4",
+            metadata={"sha1": str(h)},
         )
 
         tmp.close()
@@ -151,6 +180,7 @@ def handler(context, event):
             "resultsPath": object_name,
             "keywordId": data["keywordId"],
             "producer": data["producer"],
+            "hash": h,
         }
 
         insert_into_psql(data, context.conn)

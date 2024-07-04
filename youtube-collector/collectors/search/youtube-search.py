@@ -162,10 +162,15 @@ def produce_messages_for_collection(video_responses: list, search_info: dict, co
                         "keywordId": search_info["keywordId"],
                         "videoId": item["id"]["videoId"],
                         "producer": "youtube-search.{}".format(search_info["searchId"]),
+                        "relevanceLanguage": search_info["relevanceLanguage"],
+                        "regionCode": search_info["regionCode"],
+                        "table": "youtube-collection"
                     }
                     m = json.loads(json.dumps(row))
                     # send data to be collected
                     context.producer.send("youtube", value=m)
+                    # send data to be merged
+                    context.producer.send("youtuber-merger", value=m)
         except Exception as e:
             print(e)
             continue

@@ -2,7 +2,6 @@ import json
 import os
 
 import psycopg2
-from psycopg2.extras import Json
 
 from kafka import KafkaProducer
 
@@ -27,7 +26,7 @@ def init_context(context):
     setattr(context, "conn", conn)
 
 
-def find_on_queue(conn, video_id):
+def find_on_database(conn, data):
 
     cur = None
     row = []
@@ -36,13 +35,16 @@ def find_on_queue(conn, video_id):
 
         cur = conn.cursor()
 
-        query = "SELECT videoId, type, data FROM mergerqueue WHERE videoID = %s"
+        query = (
+            "SELECT * FROM youtube_video"
+            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+        )
 
-        cur.execute(query, (video_id,))
+        cur.execute(query, (data["videoId"], data["producer"], data["keywordId"]))
 
         row = cur.fetchone()
     except Exception as e:
-        print("ERROR FIND ON QUEUE:")
+        print("ERROR FIND ON DB:")
         print(e)
     finally:
         cur.close()
@@ -55,10 +57,26 @@ def insert_data(conn, data):
     try:
         cur = conn.cursor()
 
-        query = "INSERT INTO mergerqueue (videoID, type, data) VALUES (%s, %s, %s)"
+        query = (
+            "INSERT INTO youtube_video"
+            " (created_at, last_update, video_id, keyword_id, keyword,"
+            " relevance_language, region_code)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        )
 
         # Execute the query with parameters
-        cur.execute(query, (data["videoId"], data["type"], Json(data)))
+        cur.execute(
+            query,
+            (
+                data["createdAt"],
+                data["createdAt"],
+                data["videoId"],
+                data["keywordId"],
+                data["searchKeyword"],
+                data["relevanceLanguage"],
+                data["regionCode"],
+            ),
+        )
 
         # Commit the changes to the database
         conn.commit()
@@ -71,50 +89,58 @@ def insert_data(conn, data):
         cur.close()
 
 
-def delete_data(conn, data):
+def update_data(data, conn):
+
+    if "table" not in data:
+        return -1
+
+    query = ""
+
+    if data["table"] == "youtube-video-comments":
+        query = (
+            "UPDATE youtube_video"
+            " SET last_update = %s, comments_id = %s, comments_path = %s"
+            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+        )
+
+    elif data["table"] == "youtube-video-metadata":
+        query = (
+            "UPDATE youtube_video"
+            " SET last_update = %s, metadata_id = %s, metadata_path = %s"
+            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+        )
+
+    elif data["table"] == "youtube-video-thumbnails":
+        query = (
+            "UPDATE youtube_video"
+            " SET last_update = %s, thumbnails_id = %s, thumbnails_path = %s"
+            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+        )
+
+    elif data["table"] == "youtube-video-thumbnails":
+        query = (
+            "UPDATE youtube_video"
+            " SET last_update = %s, videofile_id = %s, videofile_path = %s"
+            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+        )
+
     cur = None
     try:
         cur = conn.cursor()
-
-        query = "DELETE FROM mergerqueue WHERE videoID = %s"
-
-        # Execute the query with parameters
-        cur.execute(query, (data["videoId"],))
-
-        # Commit the changes to the database
-        conn.commit()
-    except Exception as e:
-        print("ERROR DELETE DATA:")
-        print(e)
-        cur.execute("ROLLBACK")
-        conn.commit()
-    finally:
-        cur.close()
-
-
-def insert_merger(conn, data):
-    cur = None
-    try:
-        cur = conn.cursor()
-
-        query = "INSERT INTO mergerdata (videoID, collectionDate, searchKeyword, metadataQueryId, commentQueryId) VALUES (%s, %s, %s, %s, %s)"
-
-        # Execute the query with parameters
         cur.execute(
             query,
             (
-                data["videoId"],
                 data["collectionDate"],
-                data["searchKeyword"],
-                data["metadataQueryId"],
-                data["commentQueryId"],
+                data["queryId"],
+                data["resultsPath"],
+                data["videoId"],
+                data["producer"],
+                data["keywordId"],
             ),
         )
-
-        # Commit the changes to the database
         conn.commit()
     except Exception as e:
-        print("ERROR INSERT MERGER:")
+        print("ERROR updating yt_video")
         print(e)
         cur.execute("ROLLBACK")
         conn.commit()
@@ -125,45 +151,11 @@ def insert_merger(conn, data):
 def handler(context, event):
 
     data = json.loads(event.body.decode("utf-8"))
-    videoId = data["videoId"]
 
-    # verify if is on database
-
-    result = find_on_queue(context.conn, videoId)
-
-    if result:
-
-        if result[1] != data["type"]:
-            # create merger
-
-            result_json = result[2]
-
-            base = {
-                "videoId": videoId,
-                "collectionDate": result_json["collectionDate"],
-                "searchKeyword": data["searchKeyword"],
-            }
-
-            if data["type"] == "metadata":
-                base["metadataQueryId"] = data["queryId"]
-                base["commentQueryId"] = result_json["queryId"]
-            else:
-                base["metadataQueryId"] = result_json["queryId"]
-                base["commentQueryId"] = data["queryId"]
-
-            # insert on iceberg
-
-            m = json.loads(json.dumps(base))
-            context.producer.send("collected_youtube_data", value=m)
-
-            # insert on psql
-            insert_merger(context.conn, base)
-            # delete from queue:
-            delete_data(context.conn, data=data)
-
-        else:
-            delete_data(context.conn, data=data)
-            insert_data(context.conn, data)
+    if data["table"] == "youtube-collection":
+        insert_data(data=data, conn=context.conn)
     else:
-        # insert into the database
-        insert_data(context.conn, data)
+        # verify if is on database
+        result = find_on_database(context.conn, data)
+        if result:
+            update_data(data, context.conn)

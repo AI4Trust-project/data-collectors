@@ -212,6 +212,8 @@ def handler(context, event):
 
             m = json.loads(json.dumps(row))
             context.producer.send("collected_metadata", value=m)
+            # send data to be merged
+            context.producer.send("youtuber-merger", value=m)
 
         except Exception as e:
             print("Error Metadata Table: {}".format(e))

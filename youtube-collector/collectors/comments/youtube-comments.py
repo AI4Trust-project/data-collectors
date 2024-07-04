@@ -336,3 +336,5 @@ def handler(context, event):
         search_info["table"] = "youtube-video-comments"
         m = json.loads(json.dumps(search_info))
         context.producer.send("collected_metadata", value=m)
+        # send data to be merged
+        context.producer.send("youtuber-merger", value=m)

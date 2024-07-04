@@ -64,8 +64,8 @@ def insert_into_postgres(data, conn):
 
         query = (
             "INSERT INTO yt_thumbnail (data_owner, collection_date,"
-            " query_id, search_keyword, results_path, keyword_id, producer, file_hash)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            " query_id, search_keyword, results_path, keyword_id, producer, file_hash, video_id)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters
@@ -80,6 +80,7 @@ def insert_into_postgres(data, conn):
                 data["keywordId"],
                 data["producer"],
                 data["hash"],
+                data["videoId"]
             ),
         )
 
@@ -153,6 +154,7 @@ def handler(context, event):
 
     data = {
         "dataOwner": dataOwner,
+        "videoId": video_id,
         "collectionDate": date,
         "queryId": query_uuid,
         "searchKeyword": keyword,
@@ -169,3 +171,5 @@ def handler(context, event):
     data["table"] = "youtube-video-thumbnails"
     m = json.loads(json.dumps(data))
     context.producer.send("collected_metadata", value=m)
+    # send data to be merged
+    context.producer.send("youtuber-merger", value=m)

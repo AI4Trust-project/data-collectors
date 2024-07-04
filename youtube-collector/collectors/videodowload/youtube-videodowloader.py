@@ -189,6 +189,8 @@ def handler(context, event):
         data["table"] = "youtube-video-videofile"
         m = json.loads(json.dumps(data))
         context.producer.send("collected_metadata", value=m)
+        # send data to be merged
+        context.producer.send("youtuber-merger", value=m)
 
     except Exception as e:
         print("YT DOWNLOAD ERROR")

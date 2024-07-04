@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime, timezone
 
 import psycopg2
 
@@ -54,6 +55,8 @@ def find_on_database(conn, data):
 
 def insert_data(conn, data):
     cur = None
+    date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     try:
         cur = conn.cursor()
 
@@ -68,8 +71,8 @@ def insert_data(conn, data):
         cur.execute(
             query,
             (
-                data["createdAt"],
-                data["createdAt"],
+                date,
+                date,
                 data["videoId"],
                 data["keywordId"],
                 data["searchKeyword"],
@@ -95,6 +98,7 @@ def update_data(data, conn):
         return -1
 
     query = ""
+    date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     if data["table"] == "youtube-video-comments":
         query = (
@@ -130,7 +134,7 @@ def update_data(data, conn):
         cur.execute(
             query,
             (
-                data["collectionDate"],
+                date,
                 data["queryId"],
                 data["resultsPath"],
                 data["videoId"],

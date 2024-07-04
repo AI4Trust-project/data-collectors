@@ -1,15 +1,15 @@
-CREATE TABLE ytSearch(
-    dataOwner VARCHAR(255),
-    createdAt TIMESTAMP,
-    searchId VARCHAR(255),
-    part VARCHAR(255),
+CREATE TABLE yt_search(
+    data_owner VARCHAR(255),
+    created_at TIMESTAMP,
+    search_id VARCHAR(255),
+    yt_part VARCHAR(255),
     q VARCHAR(255),
-    maxResults INT,
-    order_ VARCHAR(255),
-    safeSearch VARCHAR(255),
-    relevanceLanguage VARCHAR(255),
-    searchType VARCHAR(255),
-    regionCode VARCHAR(255),
-    resultsPath VARCHAR(255),
-    keywordId VARCHAR(255)
+    max_results INT,
+    yt_order VARCHAR(255),
+    safe_search VARCHAR(255),
+    relevance_language VARCHAR(255),
+    search_type VARCHAR(255),
+    region_code VARCHAR(255),
+    results_path VARCHAR(255),
+    keyword_id VARCHAR(255)
 );

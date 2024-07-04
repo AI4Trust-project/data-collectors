@@ -1,10 +1,10 @@
-CREATE TABLE ytMetadata(
-    dataOwner VARCHAR(255),
-    collectionDate TIMESTAMP,
-    queryid VARCHAR(255),
-    videoid VARCHAR(255),
-    searchKeyword VARCHAR(255),
-    resultsPath VARCHAR(255),
-    keywordId VARCHAR(255),
+CREATE TABLE yt_metadata(
+    data_owner VARCHAR(255),
+    collection_date TIMESTAMP,
+    query_id VARCHAR(255),
+    video_id VARCHAR(255),
+    search_keyword VARCHAR(255),
+    results_path VARCHAR(255),
+    keyword_id VARCHAR(255),
     producer VARCHAR(255)
 );

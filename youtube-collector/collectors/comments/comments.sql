@@ -1,15 +1,15 @@
-CREATE TABLE ytComments(
-    dataOwner VARCHAR(255),
-    collectionDate TIMESTAMP,
-    queryid VARCHAR(255),
-    searchKeyword VARCHAR(255),
-    resultsPath VARCHAR(255),
-    keywordId VARCHAR(255),
+CREATE TABLE yt_comments(
+    data_owner VARCHAR(255),
+    collection_date TIMESTAMP,
+    query_id VARCHAR(255),
+    search_keyword VARCHAR(255),
+    results_path VARCHAR(255),
+    keyword_id VARCHAR(255),
     producer VARCHAR(255),
-    part_ VARCHAR(255),
-    videoid VARCHAR(255),
-    textFormat VARCHAR(255),
-    maxresults INT,
-    order_ VARCHAR(255),
-    pages INT
+    yt_part VARCHAR(255),
+    video_id VARCHAR(255),
+    text_format VARCHAR(255),
+    max_results INT,
+    yt_order VARCHAR(255),
+    n_pages INT
 );

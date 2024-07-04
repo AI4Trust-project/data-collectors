@@ -154,10 +154,10 @@ def insert_into_postgres(data, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO ytComments (dataOwner, collectionDate,"
-            " queryid, searchKeyword, resultsPath, keywordId,"
-            " producer, part_, videoid, textformat, maxresults,"
-            " order_, pages)"
+            "INSERT INTO yt_comments (data_owner, collection_date,"
+            " query_id, search_keyword, results_path, keyword_id,"
+            " producer, yt_part, video_id, text_format, max_results,"
+            " yt_order, n_pages)"
             " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
         cur.execute(

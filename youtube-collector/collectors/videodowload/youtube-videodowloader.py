@@ -63,8 +63,8 @@ def insert_into_psql(data, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO ytVideoFile (dataOwner, collectionDate,"
-            " queryId, searchKeyword, resultsPath, keywordId, producer, hash_)"
+            "INSERT INTO yt_video_file (data_owner, collection_date,"
+            " query_id, search_keyword, results_path, keyword_id, producer, file_hash)"
             " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         )
 

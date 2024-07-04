@@ -193,8 +193,8 @@ def get_keywords(context):
         cur = context.conn.cursor()
 
         query = (
-            "SELECT keyword, relevanceLanguage, regionCode,"
-            " maxResults, safeSearch, keywordId FROM searchKeywords"
+            "SELECT keyword, relevance_language, region_code,"
+            " max_results, safe_search, keyword_id FROM search_keywords"
         )
 
         cur.execute(query)
@@ -215,10 +215,10 @@ def insert_search_postgres(search_info: dict, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO ytSearch (dataOwner, createdAt,"
-            " searchId, part, q, maxResults, order_, safeSearch,"
-            " relevanceLanguage, searchType, regionCode, resultsPath,"
-            " keywordId) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            "INSERT INTO yt_search (data_owner, created_at,"
+            " search_id, yt_part, q, max_results, yt_order, safe_search,"
+            " relevance_language, search_type, region_code, results_path,"
+            " keyword_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters

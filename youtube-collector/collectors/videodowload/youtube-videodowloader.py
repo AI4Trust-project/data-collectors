@@ -64,8 +64,8 @@ def insert_into_psql(data, conn):
 
         query = (
             "INSERT INTO yt_video_file (data_owner, collection_date,"
-            " query_id, search_keyword, results_path, keyword_id, producer, file_hash)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            " query_id, search_keyword, results_path, keyword_id, producer, file_hash, video_id)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters
@@ -80,6 +80,7 @@ def insert_into_psql(data, conn):
                 data["keywordId"],
                 data["producer"],
                 data["hash"],
+                data["videoId"]
             ),
         )
 

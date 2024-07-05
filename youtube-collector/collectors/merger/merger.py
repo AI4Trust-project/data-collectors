@@ -62,9 +62,9 @@ def insert_data(conn, data):
 
         query = (
             "INSERT INTO youtube_video"
-            " (created_at, last_update, video_id, keyword_id, keyword,"
+            " (created_at, last_update, producer, video_id, keyword_id, keyword,"
             " relevance_language, region_code)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # Execute the query with parameters
@@ -73,6 +73,7 @@ def insert_data(conn, data):
             (
                 date,
                 date,
+                data["producer"],
                 data["videoId"],
                 data["keywordId"],
                 data["searchKeyword"],
@@ -121,7 +122,7 @@ def update_data(data, conn):
             " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
         )
 
-    elif data["table"] == "youtube-video-thumbnails":
+    elif data["table"] == "youtube-video-videofile":
         query = (
             "UPDATE youtube_video"
             " SET last_update = %s, videofile_id = %s, videofile_path = %s"

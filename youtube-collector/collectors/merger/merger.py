@@ -62,9 +62,9 @@ def insert_data(conn, data):
 
         query = (
             "INSERT INTO youtube_video"
-            " (created_at, last_update, producer, video_id, keyword_id, keyword,"
+            " (data_owner, created_at, last_update, producer, video_id, keyword_id, keyword,"
             " relevance_language, region_code)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # Execute the query with parameters
@@ -73,6 +73,7 @@ def insert_data(conn, data):
             (
                 date,
                 date,
+                data["dataOwner"],
                 data["producer"],
                 data["videoId"],
                 data["keywordId"],
@@ -129,6 +130,13 @@ def update_data(data, conn):
             " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
         )
 
+    elif data["table"] == "youtube-video-transcript":
+        query = (
+            "UPDATE youtube_video"
+            " SET last_update = %s, transcript_id = %s, transcript_path = %s"
+            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+        )
+
     cur = None
     try:
         cur = conn.cursor()
@@ -152,6 +160,35 @@ def update_data(data, conn):
     finally:
         cur.close()
 
+def update_subs_metric(data, conn):
+    cur = None
+    try:
+        cur = conn.cursor()
+        date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        query = (
+            "UPDATE youtube_video"
+            " SET last_update = %s, normalised_subscribers = %s"
+            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+        )
+        cur.execute(
+            query,
+            (
+                date,
+                data["normalisedSubscribers"],
+                data["videoId"],
+                data["producer"],
+                data["keywordId"],
+            ),
+        )
+        conn.commit()
+    except Exception as e:
+        print("ERROR updating yt_video metric")
+        print(e)
+        cur.execute("ROLLBACK")
+        conn.commit()
+    finally:
+        cur.close()
+
 
 def handler(context, event):
 
@@ -159,6 +196,10 @@ def handler(context, event):
 
     if data["table"] == "youtube-collection":
         insert_data(data=data, conn=context.conn)
+    elif data["table"] == "youtube-video-normalised-subscribers":
+        result = find_on_database(context.conn, data)
+        if result:
+            update_subs_metric(data=data, conn=context.conn)
     else:
         # verify if is on database
         result = find_on_database(context.conn, data)

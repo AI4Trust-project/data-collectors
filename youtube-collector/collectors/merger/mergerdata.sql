@@ -1,5 +1,7 @@
 CREATE TABLE youtube_video (
   virality_metric REAL,
+  normalised_subscribers  REAL,
+  data_owner VARCHAR(255) NOT NULL,
   created_at TIMESTAMP NOT NULL,
   last_update TIMESTAMP NOT NULL,
   producer VARCHAR(255) NOT NULL,
@@ -15,5 +17,7 @@ CREATE TABLE youtube_video (
   thumbnails_id VARCHAR(255),
   thumbnails_path VARCHAR(255),
   videofile_id VARCHAR(255),
-  videofile_path VARCHAR(255)
+  videofile_path VARCHAR(255),
+  transcript_id VARCHAR(255),
+  transcript_path VARCHAR(255)
 );

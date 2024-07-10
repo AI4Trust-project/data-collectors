@@ -1,4 +1,4 @@
-CREATE TABLE yt_normalized_subscribers (
+CREATE TABLE yt_normalised_subscribers (
   data_owner VARCHAR(255),
   collection_date TIMESTAMP,
   query_id VARCHAR(255),

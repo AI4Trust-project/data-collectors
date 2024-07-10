@@ -71,9 +71,9 @@ def insert_data(conn, data):
         cur.execute(
             query,
             (
-                date,
-                date,
                 data["dataOwner"],
+                date,
+                date,
                 data["producer"],
                 data["videoId"],
                 data["keywordId"],

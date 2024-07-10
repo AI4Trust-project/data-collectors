@@ -148,7 +148,7 @@ def insert_into_psql(data, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO yt_normalized_subscribers (data_owner, collection_date,"
+            "INSERT INTO yt_normalised_subscribers (data_owner, collection_date,"
             " query_id, search_keyword, normalised_subscribers, keyword_id, producer, video_id)"
             " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         )

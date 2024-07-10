@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import psycopg2
 from minio import Minio
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.formatters import JSONFormatter
 
 from kafka import KafkaProducer
 
@@ -104,6 +105,7 @@ def handler(context, event):
         dataOwner = "FBK-YOUTUBE"
 
         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        formatter = JSONFormatter()
         for transcript in transcript_list:
 
             language_name = str(transcript.language).replace(" ", "-").lower()
@@ -115,8 +117,11 @@ def handler(context, event):
 
             tmp = tempfile.NamedTemporaryFile()
 
+            t = transcript.fetch()
+            json_t = formatter.format_transcript(t)
+
             with open(tmp.name, "w") as f:
-                f.write(transcript.fetch())
+                json.dump(json_t, f, ensure_ascii=False)
 
             # upload
             file_name = f"{base_name}.json"

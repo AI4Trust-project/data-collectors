@@ -1,12 +1,11 @@
-# AI4Trust PoC
+# AI4Trust Data Collectors
 
-This repository contains a set of environment tests to analyze solutions for collecting data using Pulsar or Kafka with Nuclio.
+This repository contains a set of components to collect data from social media.
 
 ## Folders
 
-* **Kafka:** This repository contains a series of scripts to collect and process YouTube comments through Apache Kafka and Nuclio.
-* **Pulsar:** This repository contains a series of scripts to collect and process YouTube comments through Apache Pulsar.
-* **YouTube-Collector:** This repository contains a pipeline to collect metadata, comments, and thumbnails of YouTube videos by receiving a Video_ID.
+* **iceberg-config:** Configuration files for configuring Kafka Connect, Nessie and Iceberg.
+* **youTube-collector:** This repository contains a pipeline to collect metadata, comments, thumbnails, transcription and search of YouTube videos by receiving a Video_ID.
 
 ## Usage
 

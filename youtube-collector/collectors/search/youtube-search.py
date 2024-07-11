@@ -44,8 +44,8 @@ def init_context(context):
     setattr(context, "conn", conn)
 
 
-def generate_folder(bucket_name, keyword):
-    folder_name = [bucket_name, "search", keyword]
+def generate_folder(search_id, bucket_name, keyword):
+    folder_name = [bucket_name, search_id, "yt_search_files", keyword]
 
     return "/".join(folder_name)
 
@@ -161,10 +161,10 @@ def produce_messages_for_collection(video_responses: list, search_info: dict, co
                         "searchKeyword": search_info["q"],
                         "keywordId": search_info["keywordId"],
                         "videoId": item["id"]["videoId"],
-                        "producer": "youtube-search.{}".format(search_info["searchId"]),
+                        "producer": "yt_search.{}".format(search_info["searchId"]),
                         "relevanceLanguage": search_info["relevanceLanguage"],
                         "regionCode": search_info["regionCode"],
-                        "table": "youtube-collection"
+                        "table": "youtube-collection",
                     }
                     m = json.loads(json.dumps(row))
                     # send data to be collected
@@ -278,7 +278,11 @@ def handler(context, event):
     ) in keywords:
 
         query_uuid = str(uuid.uuid4())
-        path = generate_folder(bucket_name=bucket_name, keyword=keyword)
+        path = generate_folder(
+            search_id="yt_search.{}".format(search_info["searchId"]),
+            bucket_name=bucket_name,
+            keyword=keyword,
+        )
         date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         search_info = {

@@ -44,8 +44,8 @@ def init_context(context):
     setattr(context, "conn", conn)
 
 
-def generate_folder(video_id, keyword, bucket_name):
-    folder_name = [bucket_name, keyword]
+def generate_folder(search_id, video_id, keyword, bucket_name):
+    folder_name = [bucket_name, search_id, keyword]
     # count 2 caracters to create subfolder
     for i in range(0, len(video_id), 2):
         # Check if the remaining characters are less than 2
@@ -175,7 +175,8 @@ def handler(context, event):
             videos_response["producer"] = producer
             json.dump(videos_response, f, ensure_ascii=False, indent=4)
         object_name = "{}/{}".format(
-            generate_folder(video_id, keyword, bucket_name), "meta.json"
+            generate_folder(data["producer"], video_id, keyword, bucket_name),
+            "meta.json",
         )
         context.client.fput_object(
             bucket_name, object_name, tmp.name, content_type="application/json"
@@ -201,7 +202,9 @@ def handler(context, event):
                 "queryId": query_uuid,
                 "videoId": video_id,
                 "searchKeyword": keyword,
-                "resultsPath": generate_folder(video_id, keyword, bucket_name),
+                "resultsPath": generate_folder(
+                    data["producer"], video_id, keyword, bucket_name
+                ),
                 "keywordId": data["keywordId"],
                 "producer": data["producer"],
             }

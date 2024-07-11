@@ -40,8 +40,8 @@ def init_context(context):
     setattr(context, "conn", conn)
 
 
-def generate_folder(video_id, keyword, bucket_name):
-    folder_name = [bucket_name, keyword]
+def generate_folder(search_id, video_id, keyword, bucket_name):
+    folder_name = [bucket_name, search_id, keyword]
     # count 2 caracters to create subfolder
     for i in range(0, len(video_id), 2):
         # Check if the remaining characters are less than 2
@@ -118,7 +118,7 @@ def handler(context, event):
         try:
             image_url = f"https://img.youtube.com/vi/{video_id}/{image_types}.jpg"
             image_name = "{}/{}/{}.jpg".format(
-                generate_folder(video_id, keyword, bucket_name),
+                generate_folder(data["producer"],video_id, keyword, bucket_name),
                 "thumbnails",
                 image_types,
             )
@@ -158,7 +158,7 @@ def handler(context, event):
         "collectionDate": date,
         "queryId": query_uuid,
         "searchKeyword": keyword,
-        "resultsPath": generate_folder(video_id, keyword, bucket_name) + "/thumbnails",
+        "resultsPath": image_name,
         "keywordId": data["keywordId"],
         "producer": data["producer"],
         "hash": h,

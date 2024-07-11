@@ -40,8 +40,8 @@ def init_context(context):
     setattr(context, "conn", conn)
 
 
-def generate_folder(video_id, keyword, bucket_name):
-    folder_name = [bucket_name, keyword]
+def generate_folder(search_id, video_id, keyword, bucket_name):
+    folder_name = [bucket_name, search_id, keyword]
     # count 2 caracters to create subfolder
     for i in range(0, len(video_id), 2):
         # Check if the remaining characters are less than 2
@@ -136,7 +136,7 @@ def handler(context, event):
         file_name = "{}.mp4".format(video_id)
 
         object_name = "{}/{}".format(
-            generate_folder(video_id, keyword, bucket_name), file_name
+            generate_folder(data["producer"], video_id, keyword, bucket_name), file_name
         )
 
         h = file_hash(tmp.name)

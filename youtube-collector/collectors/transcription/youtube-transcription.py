@@ -64,8 +64,8 @@ def insert_into_psql(data, conn):
 
         query = (
             "INSERT INTO yt_video_transcription (data_owner, collection_date,"
-            " query_id, search_keyword, results_path, keyword_id, producer, video_id)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            " query_id, search_keyword, results_path, keyword_id, producer, video_id, num_transcriptions)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters
@@ -80,6 +80,7 @@ def insert_into_psql(data, conn):
                 data["keywordId"],
                 data["producer"],
                 data["videoId"],
+                data["numTranscriptions"]
             ),
         )
 
@@ -106,6 +107,7 @@ def handler(context, event):
 
         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
         formatter = JSONFormatter()
+        transcript_files = []
         for transcript in transcript_list:
 
             language_name = str(transcript.language).replace(" ", "-").lower()
@@ -130,6 +132,8 @@ def handler(context, event):
                 generate_folder(data["producer"],video_id, keyword, bucket_name), file_name
             )
 
+            transcript_files.append(object_name)
+
             context.client.fput_object(
                 bucket_name,
                 object_name,
@@ -144,6 +148,27 @@ def handler(context, event):
         date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         query_uuid = str(uuid.uuid4())
 
+        # insert every transcript in postgres and iceberg
+        for file_name in transcript_files:
+            data = {
+                "dataOwner": dataOwner,
+                "collectionDate": date,
+                "queryId": query_uuid,
+                "videoId": video_id,
+                "searchKeyword": keyword,
+                "resultsPath": file_name,
+                "keywordId": data["keywordId"],
+                "producer": data["producer"],
+                "numTranscriptions": len(transcript_files)
+            }
+
+            insert_into_psql(data, context.conn)
+            data["table"] = "youtube-video-transcript"
+            m = json.loads(json.dumps(data))
+            context.producer.send("collected_metadata", value=m)
+
+        # data for merger
+
         data = {
             "dataOwner": dataOwner,
             "collectionDate": date,
@@ -155,12 +180,6 @@ def handler(context, event):
             "producer": data["producer"],
         }
 
-        insert_into_psql(data, context.conn)
-
-        # insert in iceberg
-        data["table"] = "youtube-video-transcript"
-        m = json.loads(json.dumps(data))
-        context.producer.send("collected_metadata", value=m)
         # send data to be merged
         context.producer.send("youtuber-merger", value=m)
 

@@ -6,5 +6,6 @@ CREATE TABLE yt_video_transcription (
   results_path VARCHAR(255),
   keyword_id VARCHAR(255),
   producer VARCHAR(255),
-  video_id VARCHAR(255)
+  video_id VARCHAR(255),
+  num_transcriptions INT
 );

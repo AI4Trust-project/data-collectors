@@ -90,13 +90,14 @@ def insert_into_postgres(data: dict, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO yt_metadata (data_owner, collection_date,"
+            "INSERT INTO yt_metadata (collection_id, data_owner, collection_date,"
             " query_id, video_id, search_keyword, results_path, keyword_id,"
-            " producer) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            " producer) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
         cur.execute(
             query,
             (
+                data["collectionId"],
                 data["dataOwner"],
                 data["collectionDate"],
                 data["queryId"],
@@ -197,6 +198,7 @@ def handler(context, event):
         # Metada table
         try:
             row = {
+                "collectionId": data["collectionId"],
                 "dataOwner": dataOwner,
                 "collectionDate": date,
                 "queryId": query_uuid,
@@ -231,6 +233,7 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-statistics",
+                "collectionId": data["collectionId"],
                 "dataOwner": dataOwner,
                 "producer": data["producer"],
                 "collectionDate": date,
@@ -256,6 +259,7 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-snippet",
+                "collectionId": data["collectionId"],
                 "dataOwner": dataOwner,
                 "producer": data["producer"],
                 "keywordId": data["keywordId"],
@@ -282,6 +286,7 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-topicDetails",
+                "collectionId": data["collectionId"],
                 "dataOwner": dataOwner,
                 "producer": data["producer"],
                 "keywordId": data["keywordId"],
@@ -307,6 +312,7 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-contentDetails",
+                "collectionId": data["collectionId"],
                 "dataOwner": dataOwner,
                 "producer": data["producer"],
                 "collectionDate": date,
@@ -331,6 +337,7 @@ def handler(context, event):
 
             row = {
                 "table": "youtube-video-status",
+                "collectionId": data["collectionId"],
                 "dataOwner": dataOwner,
                 "producer": data["producer"],
                 "collectionDate": date,

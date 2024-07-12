@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import psycopg2
 from minio import Minio
-from pytube import YouTube
+from pytubefix import YouTube
 
 from kafka import KafkaProducer
 
@@ -17,7 +17,7 @@ def init_context(context):
         os.environ.get("MINIO_HOME"),
         access_key=os.environ.get("MINIO_ACCESS_KEY"),
         secret_key=os.environ.get("MINIO_SECRET_KEY"),
-        secure=False
+        secure=False,
     )
 
     producer = KafkaProducer(
@@ -63,15 +63,16 @@ def insert_into_psql(data, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO yt_video_file (data_owner, collection_date,"
+            "INSERT INTO yt_video_file (collection_id, data_owner, collection_date,"
             " query_id, search_keyword, results_path, keyword_id, producer, file_hash, video_id)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters
         cur.execute(
             query,
             (
+                data["collectionId"],
                 data["dataOwner"],
                 data["collectionDate"],
                 data["queryId"],
@@ -80,7 +81,7 @@ def insert_into_psql(data, conn):
                 data["keywordId"],
                 data["producer"],
                 data["hash"],
-                data["videoId"]
+                data["videoId"],
             ),
         )
 
@@ -172,7 +173,8 @@ def handler(context, event):
         date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         query_uuid = str(uuid.uuid4())
 
-        data = {
+        search_info = {
+            "collectionId": data["collectionId"],
             "dataOwner": dataOwner,
             "collectionDate": date,
             "queryId": query_uuid,
@@ -184,11 +186,11 @@ def handler(context, event):
             "hash": h,
         }
 
-        insert_into_psql(data, context.conn)
+        insert_into_psql(search_info, context.conn)
 
         # insert in iceberg
-        data["table"] = "youtube-video-videofile"
-        m = json.loads(json.dumps(data))
+        search_info["table"] = "youtube-video-videofile"
+        m = json.loads(json.dumps(search_info))
         context.producer.send("collected_metadata", value=m)
         # send data to be merged
         context.producer.send("youtuber-merger", value=m)

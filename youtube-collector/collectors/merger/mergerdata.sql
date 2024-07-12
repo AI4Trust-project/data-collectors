@@ -1,4 +1,5 @@
 CREATE TABLE youtube_video (
+  collection_id VARCHAR(255) PRIMARY KEY,
   virality_metric REAL,
   normalised_subscribers  REAL,
   data_owner VARCHAR(255) NOT NULL,

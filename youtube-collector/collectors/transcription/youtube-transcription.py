@@ -63,15 +63,16 @@ def insert_into_psql(data, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO yt_video_transcription (data_owner, collection_date,"
+            "INSERT INTO yt_video_transcription (collection_id, data_owner, collection_date,"
             " query_id, search_keyword, results_path, keyword_id, producer, video_id, num_transcriptions)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters
         cur.execute(
             query,
             (
+                data["collectionId"],
                 data["dataOwner"],
                 data["collectionDate"],
                 data["queryId"],
@@ -80,7 +81,7 @@ def insert_into_psql(data, conn):
                 data["keywordId"],
                 data["producer"],
                 data["videoId"],
-                data["numTranscriptions"]
+                data["numTranscriptions"],
             ),
         )
 
@@ -129,7 +130,8 @@ def handler(context, event):
             file_name = f"{base_name}.json"
 
             object_name = "{}/transcriptions/{}".format(
-                generate_folder(data["producer"],video_id, keyword, bucket_name), file_name
+                generate_folder(data["producer"], video_id, keyword, bucket_name),
+                file_name,
             )
 
             transcript_files.append(object_name)
@@ -150,7 +152,8 @@ def handler(context, event):
 
         # insert every transcript in postgres and iceberg
         for file_name in transcript_files:
-            data = {
+            search_info = {
+                "collectionId": data["collectionId"],
                 "dataOwner": dataOwner,
                 "collectionDate": date,
                 "queryId": query_uuid,
@@ -159,28 +162,33 @@ def handler(context, event):
                 "resultsPath": file_name,
                 "keywordId": data["keywordId"],
                 "producer": data["producer"],
-                "numTranscriptions": len(transcript_files)
+                "numTranscriptions": len(transcript_files),
             }
 
-            insert_into_psql(data, context.conn)
-            data["table"] = "youtube-video-transcript"
-            m = json.loads(json.dumps(data))
+            insert_into_psql(search_info, context.conn)
+            search_info["table"] = "youtube-video-transcript"
+            m = json.loads(json.dumps(search_info))
             context.producer.send("collected_metadata", value=m)
 
         # data for merger
 
-        data = {
+        search_info = {
+            "collectionId": data["collectionId"],
             "dataOwner": dataOwner,
             "collectionDate": date,
             "queryId": query_uuid,
             "videoId": video_id,
             "searchKeyword": keyword,
-            "resultsPath": f"{generate_folder(data["producer"],video_id, keyword, bucket_name)}/transcriptions",
+            "resultsPath": "{}/transcriptions".format(
+                generate_folder(data["producer"], video_id, keyword, bucket_name)
+            ),
             "keywordId": data["keywordId"],
             "producer": data["producer"],
         }
 
         # send data to be merged
+        search_info["table"] = "youtube-video-transcript"
+        m = json.loads(json.dumps(search_info))
         context.producer.send("youtuber-merger", value=m)
 
     except Exception as e:

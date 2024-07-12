@@ -36,12 +36,9 @@ def find_on_database(conn, data):
 
         cur = conn.cursor()
 
-        query = (
-            "SELECT * FROM youtube_video"
-            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
-        )
+        query = "SELECT * FROM youtube_video WHERE collection_id = %s"
 
-        cur.execute(query, (data["videoId"], data["producer"], data["keywordId"]))
+        cur.execute(query, (data["collectionId"],))
 
         row = cur.fetchone()
     except Exception as e:
@@ -62,15 +59,16 @@ def insert_data(conn, data):
 
         query = (
             "INSERT INTO youtube_video"
-            " (data_owner, created_at, last_update, producer, video_id, keyword_id, keyword,"
-            " relevance_language, region_code)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " (collection_id, data_owner, created_at, last_update, producer, video_id,"
+            " keyword_id, keyword, relevance_language, region_code)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # Execute the query with parameters
         cur.execute(
             query,
             (
+                data["collectionId"],
                 data["dataOwner"],
                 date,
                 date,
@@ -106,35 +104,35 @@ def update_data(data, conn):
         query = (
             "UPDATE youtube_video"
             " SET last_update = %s, comments_id = %s, comments_path = %s"
-            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+            " WHERE collection_id = %s"
         )
 
     elif data["table"] == "youtube-video-metadata":
         query = (
             "UPDATE youtube_video"
             " SET last_update = %s, metadata_id = %s, metadata_path = %s"
-            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+            " WHERE collection_id = %s"
         )
 
     elif data["table"] == "youtube-video-thumbnails":
         query = (
             "UPDATE youtube_video"
             " SET last_update = %s, thumbnails_id = %s, thumbnails_path = %s"
-            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+            " WHERE collection_id = %s"
         )
 
     elif data["table"] == "youtube-video-videofile":
         query = (
             "UPDATE youtube_video"
             " SET last_update = %s, videofile_id = %s, videofile_path = %s"
-            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+            " WHERE collection_id = %s"
         )
 
     elif data["table"] == "youtube-video-transcript":
         query = (
             "UPDATE youtube_video"
             " SET last_update = %s, transcript_id = %s, transcript_path = %s"
-            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+            " WHERE collection_id = %s"
         )
 
     cur = None
@@ -142,14 +140,7 @@ def update_data(data, conn):
         cur = conn.cursor()
         cur.execute(
             query,
-            (
-                date,
-                data["queryId"],
-                data["resultsPath"],
-                data["videoId"],
-                data["producer"],
-                data["keywordId"],
-            ),
+            (date, data["queryId"], data["resultsPath"], data["collectionId"]),
         )
         conn.commit()
     except Exception as e:
@@ -160,6 +151,7 @@ def update_data(data, conn):
     finally:
         cur.close()
 
+
 def update_subs_metric(data, conn):
     cur = None
     try:
@@ -168,17 +160,11 @@ def update_subs_metric(data, conn):
         query = (
             "UPDATE youtube_video"
             " SET last_update = %s, normalised_subscribers = %s"
-            " WHERE video_id = %s AND producer = %s AND keyword_id = %s"
+            " WHERE collection_id = %s"
         )
         cur.execute(
             query,
-            (
-                date,
-                data["normalisedSubscribers"],
-                data["videoId"],
-                data["producer"],
-                data["keywordId"],
-            ),
+            (date, data["normalisedSubscribers"], data["collectionId"]),
         )
         conn.commit()
     except Exception as e:

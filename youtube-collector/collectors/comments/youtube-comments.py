@@ -92,6 +92,7 @@ def insert_comments(video_response, search_info, file_name):
             try:
                 base_message = {
                     "table": "youtube-video-comment",
+                    "collectionId": search_info["collectionId"],
                     "dataOwner": search_info["dataOwner"],
                     "collectionDate": date,
                     "queryId": search_info["queryId"],
@@ -123,6 +124,7 @@ def insert_comments(video_response, search_info, file_name):
                         # create base message
                         base_message = {
                             "table": "youtube-video-comment",
+                            "collectionId": search_info["collectionId"],
                             "dataOwner": search_info["dataOwner"],
                             "collectionDate": date,
                             "queryId": search_info["queryId"],
@@ -154,15 +156,16 @@ def insert_into_postgres(data, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO yt_comments (data_owner, collection_date,"
+            "INSERT INTO yt_comments (collection_id, data_owner, collection_date,"
             " query_id, search_keyword, results_path, keyword_id,"
             " producer, yt_part, video_id, text_format, max_results,"
             " yt_order, n_pages)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
         cur.execute(
             query,
             (
+                data["collectionId"],
                 data["dataOwner"],
                 data["collectionDate"],
                 data["queryId"],
@@ -227,6 +230,7 @@ def handler(context, event):
         "maxResults": 100,
         "order": "time",
         "pages": 0,
+        "collectionId": data["collectionId"],
     }
 
     nxPage = "start"

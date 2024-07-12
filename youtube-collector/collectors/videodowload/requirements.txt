@@ -1,1 +1,1 @@
-pip install kafka-python psycopg2 minio pytube
+pip install kafka-python psycopg2 minio pytubefix

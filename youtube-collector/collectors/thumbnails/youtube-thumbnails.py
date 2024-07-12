@@ -63,15 +63,16 @@ def insert_into_postgres(data, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO yt_thumbnail (data_owner, collection_date,"
+            "INSERT INTO yt_thumbnail (collection_id, data_owner, collection_date,"
             " query_id, search_keyword, results_path, keyword_id, producer, file_hash, video_id)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters
         cur.execute(
             query,
             (
+                data["collectionId"],
                 data["dataOwner"],
                 data["collectionDate"],
                 data["queryId"],
@@ -80,7 +81,7 @@ def insert_into_postgres(data, conn):
                 data["keywordId"],
                 data["producer"],
                 data["hash"],
-                data["videoId"]
+                data["videoId"],
             ),
         )
 
@@ -118,7 +119,7 @@ def handler(context, event):
         try:
             image_url = f"https://img.youtube.com/vi/{video_id}/{image_types}.jpg"
             image_name = "{}/{}/{}.jpg".format(
-                generate_folder(data["producer"],video_id, keyword, bucket_name),
+                generate_folder(data["producer"], video_id, keyword, bucket_name),
                 "thumbnails",
                 image_types,
             )
@@ -152,7 +153,8 @@ def handler(context, event):
     date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     query_uuid = str(uuid.uuid4())
 
-    data = {
+    search_info = {
+        "collectionId": data["collectionId"],
         "dataOwner": dataOwner,
         "videoId": video_id,
         "collectionDate": date,
@@ -165,11 +167,11 @@ def handler(context, event):
     }
 
     # inser psql
-    insert_into_postgres(data, context.conn)
+    insert_into_postgres(search_info, context.conn)
 
     # insert in iceberg
-    data["table"] = "youtube-video-thumbnails"
-    m = json.loads(json.dumps(data))
+    search_info["table"] = "youtube-video-thumbnails"
+    m = json.loads(json.dumps(search_info))
     context.producer.send("collected_metadata", value=m)
     # send data to be merged
     context.producer.send("youtuber-merger", value=m)

@@ -155,6 +155,7 @@ def produce_messages_for_collection(video_responses: list, search_info: dict, co
         try:
             if "items" in json_object.keys():
                 for item in json_object["items"]:
+                    collection_id = str(uuid.uuid4())
                     row = {
                         "dataOwner": search_info["dataOwner"],
                         "createdAt": search_info["createdAt"],
@@ -165,6 +166,7 @@ def produce_messages_for_collection(video_responses: list, search_info: dict, co
                         "relevanceLanguage": search_info["relevanceLanguage"],
                         "regionCode": search_info["regionCode"],
                         "table": "youtube-collection",
+                        "collectionId": collection_id,
                     }
                     m = json.loads(json.dumps(row))
                     # send data to be collected
@@ -279,9 +281,9 @@ def handler(context, event):
 
         query_uuid = str(uuid.uuid4())
         path = generate_folder(
-            search_id="yt_search.{}".format(search_info["searchId"]),
-            bucket_name=bucket_name,
-            keyword=keyword,
+            "yt_search.{}".format(query_uuid),
+            bucket_name,
+            keyword,
         )
         date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 

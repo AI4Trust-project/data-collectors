@@ -148,15 +148,16 @@ def insert_into_psql(data, conn):
         cur = conn.cursor()
 
         query = (
-            "INSERT INTO yt_normalised_subscribers (data_owner, collection_date,"
+            "INSERT INTO yt_normalised_subscribers (collection_id, data_owner, collection_date,"
             " query_id, search_keyword, normalised_subscribers, keyword_id, producer, video_id)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
 
         # execute the query with parameters
         cur.execute(
             query,
             (
+                data["collectionId"],
                 data["dataOwner"],
                 data["collectionDate"],
                 data["queryId"],
@@ -192,7 +193,8 @@ def handler(context, event):
     date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     query_uuid = str(uuid.uuid4())
 
-    data = {
+    search_info = {
+        "collectionId": data["collectionId"],
         "dataOwner": dataOwner,
         "collectionDate": date,
         "queryId": query_uuid,
@@ -203,10 +205,10 @@ def handler(context, event):
         "producer": data["producer"],
     }
 
-    insert_into_psql(data=data, conn=context.conn)
+    insert_into_psql(data=search_info, conn=context.conn)
 
-    data["table"] = "youtube-video-normalised-subscribers"
-    m = json.loads(json.dumps(data))
+    search_info["table"] = "youtube-video-normalised-subscribers"
+    m = json.loads(json.dumps(search_info))
     context.producer.send("collected_metadata", value=m)
     # send data to be merged
     context.producer.send("youtuber-merger", value=m)

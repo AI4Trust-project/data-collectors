@@ -25,7 +25,7 @@ spec:
     iceberg.catalog.client.region: us-east-1
     iceberg.catalog.s3.path-style-access: true
     # time to commit and auto create
-    iceberg.control.commit.interval-ms: 10000
+    iceberg.control.commit.interval-ms: 300000
     iceberg.tables.auto-create-enabled: true
     iceberg.tables.evolve-schema-enabled: true
     iceberg.tables.dynamic-enabled: true

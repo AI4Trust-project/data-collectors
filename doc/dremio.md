@@ -86,7 +86,10 @@ Perform BINPACK
 
 ```python
 sql = 'OPTIMIZE TABLE nessie."youtube-video-comment" REWRITE DATA USING BIN_PACK'
-
 data = client.query(sql) 
 print(data) # 
+```
+
+```sql
+ALTER TABLE nessie."youtube-video-comments" SET TBLPROPERTIES ('write.metadata.delete-after-commit.enabled'='true');
 ```

@@ -83,23 +83,23 @@ def wait_until_midnight():
     time.sleep(wait_time)
 
 
-def insert_comments(video_response, search_info, file_name):
+def insert_comments(video_response, search_info, file_name, context):
     date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    data = []
+
     if "items" in video_response.keys():
         items = video_response["items"]
         for i in items:
             try:
                 base_message = {
-                    "table": "youtube-video-comment",
+                    "table": "youtube-video-comments",
                     "collectionId": search_info["collectionId"],
                     "dataOwner": search_info["dataOwner"],
                     "collectionDate": date,
                     "queryId": search_info["queryId"],
                     "searchKeyword": search_info["searchKeyword"],
                     "resultsPath": file_name,
-                    "keywordId": data["keywordId"],
-                    "producer": data["producer"],
+                    "keywordId": search_info["keywordId"],
+                    "producer": search_info["producer"],
                 }
                 base_message["id"] = i["id"]
                 comment = i["snippet"]
@@ -113,8 +113,9 @@ def insert_comments(video_response, search_info, file_name):
                 for k, v in comment.items():
                     base_message[k] = v
 
-                # save comment
-                data.append(base_message)
+                # send comment
+                m = json.loads(json.dumps(base_message))
+                context.producer.send("collected_comments", value=m)
 
                 # verify replies
                 if "replies" in i:
@@ -123,15 +124,15 @@ def insert_comments(video_response, search_info, file_name):
                     for r in replies:
                         # create base message
                         base_message = {
-                            "table": "youtube-video-comment",
+                            "table": "youtube-video-comments",
                             "collectionId": search_info["collectionId"],
                             "dataOwner": search_info["dataOwner"],
                             "collectionDate": date,
                             "queryId": search_info["queryId"],
                             "searchKeyword": search_info["searchKeyword"],
                             "resultsPath": file_name,
-                            "keywordId": data["keywordId"],
-                            "producer": data["producer"],
+                            "keywordId": search_info["keywordId"],
+                            "producer": search_info["producer"],
                         }
                         # add id
                         base_message["id"] = r["id"]
@@ -140,13 +141,12 @@ def insert_comments(video_response, search_info, file_name):
                         for k, v in s.items():
                             base_message[k] = v
                         # save reply
-                        data.append(base_message)
+                        m = json.loads(json.dumps(base_message))
+                        context.producer.send("collected_comments", value=m)
             except Exception as e:
                 # print("ERROR INSERT COMMENTS")
                 # print(e)
                 continue
-
-    return data
 
 
 def insert_into_postgres(data, conn):
@@ -285,14 +285,12 @@ def handler(context, event):
             tmp.close()
 
             # insert comments on iceberg
-            comments = insert_comments(
+            insert_comments(
                 video_response=comment_threads,
                 search_info=search_info,
                 file_name=object_name,
+                context=context,
             )
-            for c in comments:
-                m = json.loads(json.dumps(c))
-                context.producer.send("collected_comments", value=m)
 
             if "nextPageToken" in comment_threads.keys():
                 nxPage = comment_threads["nextPageToken"]
@@ -344,6 +342,5 @@ def handler(context, event):
 
         search_info["table"] = "youtube-video-comments"
         m = json.loads(json.dumps(search_info))
-        context.producer.send("collected_metadata", value=m)
         # send data to be merged
         context.producer.send("youtuber-merger", value=m)

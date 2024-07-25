@@ -127,10 +127,15 @@ def handler(context, event):
                             "data_owner": os.environ["TELEGRAM_OWNER"],
                             "search_keyword": kw,
                             "language_code": language_code,
+                            "producer": "channels_to_query.{}".format(query_uuid)
                         }
                         data.append(row)
 
                     insert_into_postgres(connection, data)
+                    # send channels to be ranked
+                    for d in data:
+                        m = json.loads(json.dumps(d))
+                        producer.send("chans_to_query", value=m) 
                 except Exception as e:
                     print("ERRO SEARCHING KEYWORD")
                     print(kw)
@@ -138,4 +143,4 @@ def handler(context, event):
                     continue
 
     m = json.loads(json.dumps({"status": "init_done"}))
-    producer.send("telegra-keywords", value=m)
+    producer.send("telegram-keywords", value=m)

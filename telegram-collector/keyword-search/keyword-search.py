@@ -19,7 +19,7 @@ async def init_context(context):
     secret = os.environ["MINIO_SECRET_KEY"]
     minio_home = os.environ["MINIO_HOME"]
     storage_options = {
-        "endpoint_url": f"http://{minio_home}",
+        "endpoint_url": f"https://{minio_home}",
         "key": access_key,
         "secret": secret,
     }
@@ -90,6 +90,33 @@ def insert_into_postgres(conn, values: list):
         cur.close()
 
 
+def remove_duplicates(conn, values: list):
+    data = []
+    cur = None
+    try:
+        cur = conn.cursor()
+        for v in values:
+            query = (
+                "SELECT id, access_hash FROM channels_to_query"
+                " WHERE id = %s AND access_hash = %s"
+            )
+
+            cur.execute(query, (v["id"], v["access_hash"]))
+
+            row = cur.fetchone()
+
+            if not row:
+                data.append(v)
+
+    except Exception as e:
+        print("ERROR SEARCHING channels_to_query")
+        print(e)
+    finally:
+        cur.close()
+
+    return data
+
+
 def handler(context, event):
     # event is not used, it's a cron job
     # add nest asyncio for waiting calls
@@ -127,15 +154,17 @@ def handler(context, event):
                             "data_owner": os.environ["TELEGRAM_OWNER"],
                             "search_keyword": kw,
                             "language_code": language_code,
-                            "producer": "channels_to_query.{}".format(query_uuid)
+                            "producer": "channels_to_query.{}".format(query_uuid),
                         }
                         data.append(row)
 
-                    insert_into_postgres(connection, data)
+                    # verify if they already exists
+                    rows_to_insert = remove_duplicates(connection, data)
+                    insert_into_postgres(connection, rows_to_insert)
                     # send channels to be ranked
-                    for d in data:
+                    for d in rows_to_insert:
                         m = json.loads(json.dumps(d))
-                        producer.send("chans_to_query", value=m) 
+                        producer.send("chans_to_query", value=m)
                 except Exception as e:
                     print("ERRO SEARCHING KEYWORD")
                     print(kw)

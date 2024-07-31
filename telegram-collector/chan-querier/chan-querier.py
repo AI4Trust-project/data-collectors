@@ -22,7 +22,7 @@ async def init_context(context):
     secret = os.environ["MINIO_SECRET_KEY"]
     minio_home = os.environ["MINIO_HOME"]
     storage_options = {
-        "endpoint_url": f"http://{minio_home}",
+        "endpoint_url": f"https://{minio_home}",
         "key": access_key,
         "secret": secret,
     }
@@ -62,13 +62,9 @@ def update_postgres(conn, channel_update_params: dict):
     cur = None
     try:
         cur = conn.cursor()
+        query = "UPDATE channels_to_query SET collection_priority = %s, language_code = %s WHERE id = %s"
         cur.execute(
-            """
-            UPDATE channels_to_query
-            SET collection_priority = %s,
-                language_code = %s,
-            WHERE id = %s
-            """,
+            query,
             (
                 channel_update_params["collection_priority"],
                 channel_update_params["language_code"],
@@ -102,7 +98,7 @@ def handler(context, event):
     connection = context.connection
 
     data = json.loads(event.body.decode("utf-8"))
-    channel_id = data["id"]
+    channel_id = str(data["id"])
     access_hash = data["access_hash"]
 
     input_chan = collegram.channels.get_input_chan(
@@ -146,8 +142,8 @@ def handler(context, event):
 
     # Order chats such that one corresponding to channel_full is first, so we don't
     # query it twice
-    chats = [c for c in channel_full.chats if c.id == channel_full.id] + [
-        c for c in channel_full.chats if c.id != channel_full.id
+    chats = [c for c in channel_full.chats if c.id == channel_id] + [
+        c for c in channel_full.chats if c.id != channel_id
     ]
     for i, chat in enumerate(chats):
         if i > 0:

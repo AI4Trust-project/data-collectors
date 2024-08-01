@@ -90,52 +90,55 @@ def get_priority(lang_code, lang_prios):
 
 def handler(context, event):
     nest_asyncio.apply()
-
+    # Keep, in future if we want to use more than 1 key, this is essential
     key_name = os.environ["TELEGRAM_OWNER"]
+
+    # TODO: update or save new every time? issue: propagate data obtained through
+    # + who starts the chain by calling chan-querier?
+    # iterating through mssages, such as "forwards_from".
     fs = context.fs
     producer = context.producer
     client = context.client
     connection = context.connection
 
     data = json.loads(event.body.decode("utf-8"))
-    channel_id = str(data["id"])
+    channel_id = data["id"]
     access_hash = data["access_hash"]
-
-    input_chan = collegram.channels.get_input_chan(
-        client,
-        channel_id=channel_id,  # here OG ID
-        access_hash=access_hash,
-    )
-
-    data_path = Path("/telegram/")
-    paths = collegram.paths.ProjectPaths(data=data_path)
-
-    anon_id = channel_id
-    chan_paths = collegram.paths.ChannelPaths(anon_id, paths)
-    saved_channel_full_d = collegram.channels.load(anon_id, paths, fs=fs)
-    anonymiser = collegram.utils.HMAC_anonymiser(save_path=chan_paths.anon_map, fs=fs)
+    channel_username = data.get("channel_username")
+    # TODO: following to be set in `messages_querier` through an SQL update, whenever a
+    # forwarded channel is found
+    # distance_from_core = data["distance_from_core"]
+    # nr_forwarding_channels = data["nr_forwarding_channels"]
 
     try:
-        channel_full, channel_full_d = collegram.channels.get_full(
+        channel_full = collegram.channels.get_full(
             client,
-            paths,
-            anonymiser,
-            # key_name=key_name,
-            channel=input_chan,
+            channel_username=channel_username,
             channel_id=channel_id,
-            force_query=True,
+            access_hash=access_hash,
         )
     except (
         ChannelInvalidError,
         ChannelPrivateError,
         UsernameInvalidError,
         ValueError,
-    ):
+    ) as e:
         # TODO What then?
         # For all but ChannelPrivateError, can try with another key (TODO: add to
         # list of new channels?).
         # logger.warning(f"could not get data for listed channel {channel_id}")
-        pass
+        raise e
+
+    data_path = Path("/telegram/")
+    paths = collegram.paths.ProjectPaths(data=data_path)
+
+    def insert_anon_pair(original, anonymised):
+        insert_d = {"original": original, "anonymised": anonymised}
+        collegram.utils.insert_into_postgres(
+            connection, table="anonymisation_map", values=insert_d
+        )
+
+    anonymiser = collegram.utils.HMAC_anonymiser(save_func=insert_anon_pair)
 
     lang_priorities = {lc: 1 for lc in ["EN", "FR", "ES", "DE", "EL", "IT", "PL", "RO"]}
     lang_detector = LanguageDetectorBuilder.from_all_languages().build()
@@ -147,13 +150,12 @@ def handler(context, event):
     ]
     for i, chat in enumerate(chats):
         if i > 0:
-            channel_full, channel_full_d = collegram.channels.get_full(
+            channel_full = collegram.channels.get_full(
                 client,
-                paths,
-                anonymiser,
                 channel=chat,
-                force_query=True,
             )
+
+        channel_full_d = json.loads(channel_full.to_json())
 
         participants_iter = (
             collegram.users.get_channel_participants(client, chat)
@@ -175,9 +177,7 @@ def handler(context, event):
             count = collegram.messages.get_channel_messages_count(client, chat, f)
             channel_full_d[f"{content_type}_count"] = count
 
-        lang_code = collegram.text.detect_chan_lang(
-            channel_full_d, anonymiser.inverse_anon_map, lang_detector
-        )
+        lang_code = collegram.text.detect_chan_lang(channel_full_d, lang_detector)
         prio = get_priority(lang_code, lang_priorities)
         update_d = {
             "id": chat.id,
@@ -192,11 +192,5 @@ def handler(context, event):
             channel_full_d,
             anonymiser,
         )
-        for key in ["recommended_channels", "forwards_from"]:
-            channel_full_d[key] = list(
-                set(channel_full_d.get(key, [])).union(
-                    saved_channel_full_d.get(key, [])
-                )
-            )
         collegram.channels.save(channel_full_d, paths, key_name, fs=fs)
         # TODO: send any Kafka message to say this is done?

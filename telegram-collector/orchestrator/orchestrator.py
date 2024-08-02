@@ -31,7 +31,7 @@ def handler(context, event):
         # TODO: also WHERE last_queried_at is inferior to some value
         # in prio, take into account number of already high-priority of same language?
         cur.execute(
-            "SELECT id, access_hash"
+            "SELECT id, access_hash, distance_from_core"
             " FROM channels_to_query"
             " ORDER BY collection_priority DESC"
             " LIMIT 1"
@@ -40,9 +40,13 @@ def handler(context, event):
 
     # TODO: delete entry? or rather put flag / last queried at?
     if chan_to_query is not None:
-        channel_id, access_hash = chan_to_query
+        channel_id, access_hash, distance_from_core = chan_to_query
         producer.send(
             "chans_to_query",
-            value={"channel_id": channel_id, "access_hash": access_hash},
+            value={
+                "channel_id": channel_id,
+                "access_hash": access_hash,
+                "distance_from_core": distance_from_core,
+            },
         )
     # TODO: else?

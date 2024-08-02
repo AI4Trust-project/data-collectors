@@ -3,6 +3,7 @@ CREATE TABLE channels_to_query(
     access_hash BIGINT NOT NULL,
     data_owner VARCHAR(255),
     search_date TIMESTAMP,
+    channel_last_queried_at TIMESTAMP,
     query_id VARCHAR(255),
     search_keyword VARCHAR(255),
     language_code VARCHAR(255),

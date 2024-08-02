@@ -1,4 +1,5 @@
 import json
+import datetime
 import os
 from pathlib import Path
 
@@ -111,12 +112,20 @@ def handler(context, event):
     # nr_forwarding_channels = data["nr_forwarding_channels"]
 
     try:
+        query_time = (
+            datetime.datetime.now()
+            .astimezone(datetime.timezone.utc)
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
         channel_full = collegram.channels.get_full(
             client,
             channel_username=channel_username,
             channel_id=channel_id,
             access_hash=access_hash,
         )
+        update_d = {"id": channel_id, "channel_last_queried_at": query_time}
+        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+
     except (
         ChannelInvalidError,
         ChannelPrivateError,
@@ -150,9 +159,18 @@ def handler(context, event):
     ]
     for i, chat in enumerate(chats):
         if i > 0:
+            query_time = (
+                datetime.datetime.now()
+                .astimezone(datetime.timezone.utc)
+                .strftime("%Y-%m-%dT%H:%M:%SZ")
+            )
             channel_full = collegram.channels.get_full(
                 client,
                 channel=chat,
+            )
+            update_d = {"id": channel_id, "channel_last_queried_at": query_time}
+            collegram.utils.update_postgres(
+                connection, "channels_to_query", update_d, "id"
             )
 
         channel_full_d = json.loads(channel_full.to_json())

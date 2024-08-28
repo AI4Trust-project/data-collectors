@@ -103,7 +103,7 @@ def handler(context, event):
     connection = context.connection
 
     data = json.loads(event.body.decode("utf-8"))
-    channel_id = data["channel_id"]
+    channel_id = data["id"]
     access_hash = data["access_hash"]
     channel_username = data.get("channel_username")
     # TODO: following to be set in `messages_querier` through an SQL update, whenever a

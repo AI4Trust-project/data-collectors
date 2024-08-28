@@ -1,1 +1,1 @@
-pip install git+https://github.com/TLouf/collegram.git s3fs kafka-python psycopg[binary] nest_asyncio
+pip install git+https://github.com/TLouf/collegram.git@nuclio s3fs kafka-python psycopg[binary] nest_asyncio

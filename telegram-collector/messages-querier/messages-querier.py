@@ -36,7 +36,7 @@ async def init_context(context):
         password=os.environ["POSTGRES_PW"],
         host=os.environ["POSTGRES_IP"],
         port=os.environ["POSTGRES_PORT"],
-        database=os.environ["POSTGRES_DB"],
+        dbname=os.environ["POSTGRES_DB"],
     )
     setattr(context, "connection", connection)
 
@@ -109,7 +109,7 @@ def handler(context, event):
     connection = context.connection
 
     data = json.loads(event.body.decode("utf-8"))
-    channel_id = data["id"]
+    channel_id = data["channel_id"]
     access_hash = data["access_hash"]
     channel_username = data.get("channel_username")
     dist_from_core = data["distance_from_core"]

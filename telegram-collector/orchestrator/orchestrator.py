@@ -11,7 +11,7 @@ def init_context(context):
         password=os.environ["POSTGRES_PW"],
         host=os.environ["POSTGRES_IP"],
         port=os.environ["POSTGRES_PORT"],
-        database=os.environ["POSTGRES_DB"],
+        dbname=os.environ["POSTGRES_DB"],
     )
     setattr(context, "connection", connection)
 
@@ -42,11 +42,17 @@ def handler(context, event):
     if chan_to_query is not None:
         channel_id, access_hash, distance_from_core = chan_to_query
         producer.send(
-            "chans_to_query",
+            "chans_to_message",
             value={
                 "channel_id": channel_id,
                 "access_hash": access_hash,
                 "distance_from_core": distance_from_core,
             },
         )
+
+        return {
+                "channel_id": channel_id,
+                "access_hash": access_hash,
+                "distance_from_core": distance_from_core,
+            }
     # TODO: else?

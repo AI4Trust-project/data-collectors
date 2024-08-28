@@ -47,6 +47,7 @@ async def init_context(context):
         os.environ["AI4TRUST_API_HASH"],
         flood_sleep_threshold=24 * 3600,
     )
+    await client.start(os.environ["AI4TRUST_PHONE_NUMBER"])
     setattr(context, "client", client)
 
     broker = os.environ.get("KAFKA_BROKER")

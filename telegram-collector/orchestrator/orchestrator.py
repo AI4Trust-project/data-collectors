@@ -51,8 +51,8 @@ def handler(context, event):
         )
 
         return {
-                "channel_id": channel_id,
-                "access_hash": access_hash,
-                "distance_from_core": distance_from_core,
-            }
+            "channel_id": channel_id,
+            "access_hash": access_hash,
+            "distance_from_core": distance_from_core,
+        }
     # TODO: else?

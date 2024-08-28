@@ -165,6 +165,7 @@ def handler(context, event):
     )
 
     forwarded_chans = set()
+    fs.mkdirs(chan_paths.messages, exist_ok=True)
     # Caution: the sorting only works because of file name format!
     existing_files = sorted(list(fs.ls(chan_paths.messages)))
 

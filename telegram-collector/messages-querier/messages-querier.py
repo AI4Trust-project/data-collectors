@@ -58,7 +58,7 @@ async def init_context(context):
     setattr(context, "producer", producer)
 
 
-def handle_new_forward(fwd_id, client, connection, pred_dist_from_core):
+def handle_new_forward(fwd_id, client, connection, pred_dist_from_core, producer):
     with connection.cursor() as cur:
         cur.execute(
             f"SELECT nr_forwarding_channels, distance_from_core FROM channels_to_query WHERE id = {fwd_id}"
@@ -83,10 +83,17 @@ def handle_new_forward(fwd_id, client, connection, pred_dist_from_core):
         insert_d = {
             "id": fwd_id,
             "access_hash": fwd_hash,
+            "data_owner": os.environ["TELEGRAM_OWNER"],
             "nr_forwarding_channels": 1,
             "distance_from_core": pred_dist_from_core + 1,
         }
         collegram.utils.insert_into_postgres(connection, "channels_to_query", insert_d)
+        m = {
+            "id": fwd_id,
+            "access_hash": fwd_hash,
+            "data_owner": os.environ["TELEGRAM_OWNER"],
+        }
+        producer.send("chans_to_query", value=m)
 
     else:
         (nr_forwarding, distance_from_core) = prio_info
@@ -212,6 +219,6 @@ def handler(context, event):
 
             for fwd_id in new_fwds:
                 forwarded_chans.add(fwd_id)
-                handle_new_forward(fwd_id, client, connection, dist_from_core)
+                handle_new_forward(fwd_id, client, connection, dist_from_core, producer)
 
     # TODO: say we're done

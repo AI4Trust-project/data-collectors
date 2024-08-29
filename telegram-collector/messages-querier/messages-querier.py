@@ -165,9 +165,8 @@ def handler(context, event):
     )
 
     forwarded_chans = set()
-    fs.mkdirs(chan_paths.messages, exist_ok=True)
     # Caution: the sorting only works because of file name format!
-    existing_files = sorted(list(fs.ls(chan_paths.messages)))
+    existing_files = sorted(list(fs.glob(f"{chan_paths.messages}/*.jsonl")))
 
     for dt_from, dt_to in zip(dt_bin_edges[:-1], dt_bin_edges[1:]):
         chunk_fwds = set()

@@ -107,6 +107,41 @@ def handle_new_forward(fwd_id, client, connection, pred_dist_from_core, producer
         collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
 
+async def collect_messages(
+    client: TelegramClient,
+    channel: TypeInputChannel,
+    dt_from: datetime.datetime,
+    dt_to: datetime.datetime,
+    forwards_set: set[int],
+    anon_func,
+    messages_save_path: Path,
+    media_save_path: Path,
+    fs,
+    producer,
+    offset_id=0,
+):
+    with fs.open(messages_save_path, "a") as f:
+        async for m in collegram.messages.yield_channel_messages(
+            client,
+            channel,
+            dt_from,
+            dt_to,
+            forwards_set,
+            anon_func,
+            media_save_path,
+            offset_id=offset_id,
+            fs=fs,
+        ):
+            m_json = m.to_json()
+            f.write(m_json)
+            f.write("\n")
+
+            m_dict = collegram.messages.to_flat_dict(json.loads(m_json))
+            m_dict["table"] = "telegram-channel-messages"
+            # send message to iceberg
+            producer.send("telegram_collected_messages", value=m_dict)
+
+
 def handler(context, event):
     nest_asyncio.apply()
 
@@ -200,9 +235,8 @@ def handler(context, event):
                 if last_message_saved:
                     offset_id = collegram.json.read_message(last_message_saved).id
 
-            # Save messages, don't get to avoid overflowing memory.
             client.loop.run_until_complete(
-                collegram.messages.save_channel_messages(
+                collect_messages(
                     client,
                     input_chat,
                     dt_from,
@@ -211,10 +245,12 @@ def handler(context, event):
                     anonymiser.anonymise,
                     messages_save_path,
                     media_save_path,
+                    fs,
+                    producer,
                     offset_id=offset_id,
-                    fs=fs,
                 )
             )
+
             new_fwds = chunk_fwds.difference(forwarded_chans)
 
             for fwd_id in new_fwds:

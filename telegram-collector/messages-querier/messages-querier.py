@@ -138,6 +138,7 @@ async def collect_messages(
 
             m_dict = collegram.messages.to_flat_dict(m)
             m_dict["table"] = "telegram-channel-messages"
+            m_dict["channel_id"] = channel.channel_id
             # send message to iceberg
             producer.send("telegram_collected_messages", value=m_dict)
 

@@ -123,9 +123,6 @@ def handler(context, event):
             channel_id=channel_id,
             access_hash=access_hash,
         )
-        update_d = {"id": channel_id, "channel_last_queried_at": query_time}
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
-
     except (
         ChannelInvalidError,
         ChannelPrivateError,
@@ -137,6 +134,9 @@ def handler(context, event):
         # list of new channels?).
         # logger.warning(f"could not get data for listed channel {channel_id}")
         raise e
+
+    update_d = {"id": channel_id, "channel_last_queried_at": query_time}
+    collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)

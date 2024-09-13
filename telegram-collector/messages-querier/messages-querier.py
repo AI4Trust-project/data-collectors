@@ -136,7 +136,7 @@ async def collect_messages(
             f.write(m_json)
             f.write("\n")
 
-            m_dict = collegram.messages.to_flat_dict(json.loads(m_json))
+            m_dict = collegram.messages.to_flat_dict(m)
             m_dict["table"] = "telegram-channel-messages"
             # send message to iceberg
             producer.send("telegram_collected_messages", value=m_dict)

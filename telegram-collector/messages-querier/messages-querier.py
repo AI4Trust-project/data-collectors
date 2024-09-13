@@ -15,6 +15,7 @@ from telethon.errors import (
     ChannelPrivateError,
     UsernameInvalidError,
 )
+from telethon.types import MessageService
 from telethon.sessions import StringSession
 
 
@@ -136,11 +137,14 @@ async def collect_messages(
             f.write(m_json)
             f.write("\n")
 
-            m_dict = collegram.messages.to_flat_dict(m)
-            m_dict["table"] = "telegram-channel-messages"
-            m_dict["channel_id"] = channel.channel_id
-            # send message to iceberg
-            producer.send("telegram_collected_messages", value=m_dict)
+            # MessageService have so many potential structures that putting them in a
+            # table does not make sense.
+            if not isinstance(m, MessageService):
+                m_dict = collegram.messages.to_flat_dict(m)
+                m_dict["table"] = "telegram-channel-messages"
+                m_dict["channel_id"] = channel.channel_id
+                # send message to iceberg
+                producer.send("telegram_collected_messages", value=m_dict)
 
 
 def handler(context, event):

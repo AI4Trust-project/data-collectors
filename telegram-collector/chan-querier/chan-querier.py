@@ -211,4 +211,9 @@ def handler(context, event):
             anonymiser,
         )
         collegram.channels.save(channel_full_d, paths, key_name, fs=fs)
+
+        flat_channel_d = collegram.channels.flatten_dict(channel_full_d)
+        flat_channel_d["table"] = "telegram-channel-metadata"
+        # send channel metadata to iceberg
+        producer.send("telegram_collected_channels", value=flat_channel_d)
         # TODO: send any Kafka message to say this is done?

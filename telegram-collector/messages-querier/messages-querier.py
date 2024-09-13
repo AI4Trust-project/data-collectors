@@ -1,4 +1,5 @@
 import datetime
+import uuid
 import json
 import os
 from pathlib import Path
@@ -119,6 +120,7 @@ async def collect_messages(
     media_save_path: Path,
     fs,
     producer,
+    query_id,
     offset_id=0,
 ):
     with fs.open(messages_save_path, "a") as f:
@@ -143,6 +145,7 @@ async def collect_messages(
                 m_dict = collegram.messages.to_flat_dict(m)
                 m_dict["table"] = "telegram-channel-messages"
                 m_dict["channel_id"] = channel.channel_id
+                m_dict["query_id"] = query_id
                 # send message to iceberg
                 producer.send("telegram_collected_messages", value=m_dict)
 
@@ -240,6 +243,20 @@ def handler(context, event):
                 if last_message_saved:
                     offset_id = collegram.json.read_message(last_message_saved).id
 
+            query_time = (
+                datetime.datetime.now()
+                .astimezone(datetime.timezone.utc)
+                .strftime("%Y-%m-%dT%H:%M:%SZ")
+            )
+            query_info = {
+                "query_id": str(uuid.uuid4()),
+                "query_date": query_time,
+                "data_owner": os.environ["TELEGRAM_OWNER"],
+                "channel_id": input_chat.channel_id,
+                "message_offset_id": offset_id,
+                "result_path": str(messages_save_path.absolute()),
+            }
+
             client.loop.run_until_complete(
                 collect_messages(
                     client,
@@ -252,9 +269,14 @@ def handler(context, event):
                     media_save_path,
                     fs,
                     producer,
+                    query_info["query_id"],
                     offset_id=offset_id,
                 )
             )
+
+            # Save metadata about the query itself
+            m = json.loads(json.dumps(query_info))
+            producer.send("telegram_collected_metadata", value=m)
 
             new_fwds = chunk_fwds.difference(forwarded_chans)
 

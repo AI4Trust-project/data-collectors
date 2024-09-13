@@ -1,4 +1,5 @@
 import json
+import uuid
 import datetime
 import os
 from pathlib import Path
@@ -138,6 +139,12 @@ def handler(context, event):
     update_d = {"id": channel_id, "channel_last_queried_at": query_time}
     collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
+    query_info = {
+        "query_id": str(uuid.uuid4()),
+        "query_date": query_time,
+        "data_owner": os.environ["TELEGRAM_OWNER"],
+    }
+
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)
 
@@ -214,6 +221,13 @@ def handler(context, event):
 
         flat_channel_d = collegram.channels.flatten_dict(channel_full_d)
         flat_channel_d["table"] = "telegram-channel-metadata"
+        flat_channel_d["query_id"] = query_info["query_id"]
         # send channel metadata to iceberg
         producer.send("telegram_collected_channels", value=flat_channel_d)
-        # TODO: send any Kafka message to say this is done?
+
+        # Save metadata about the query itself
+        query_info["channel_id"] = chat.id
+        chan_paths = collegram.paths.ChannelPaths(chat.id, paths)
+        query_info["result_path"] = str(chan_paths.channel.absolute())
+        m = json.loads(json.dumps(query_info))
+        producer.send("telegram_collected_metadata", value=m)

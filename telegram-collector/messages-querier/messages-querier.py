@@ -1,7 +1,7 @@
 import datetime
-import uuid
 import json
 import os
+import uuid
 from pathlib import Path
 
 import collegram
@@ -16,8 +16,8 @@ from telethon.errors import (
     ChannelPrivateError,
     UsernameInvalidError,
 )
-from telethon.types import MessageService
 from telethon.sessions import StringSession
+from telethon.types import MessageService
 
 
 async def init_context(context):
@@ -112,7 +112,7 @@ def handle_new_forward(fwd_id, client, connection, pred_dist_from_core, producer
 
 async def collect_messages(
     client: TelegramClient,
-    channel: TypeInputChannel,
+    channel,
     dt_from: datetime.datetime,
     dt_to: datetime.datetime,
     forwards_set: set[int],

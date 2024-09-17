@@ -130,9 +130,6 @@ def handler(context, event):
     # Keep, in future if we want to use more than 1 key, this is essential
     key_name = os.environ["TELEGRAM_OWNER"]
 
-    # TODO: update or save new every time? issue: propagate data obtained through
-    # + who starts the chain by calling chan-querier?
-    # iterating through mssages, such as "forwards_from".
     fs = context.fs
     producer = context.producer
     client = context.client
@@ -142,10 +139,7 @@ def handler(context, event):
     channel_id = data["id"]
     access_hash = data["access_hash"]
     channel_username = data.get("channel_username")
-    # TODO: following to be set in `messages_querier` through an SQL update, whenever a
-    # forwarded channel is found
     distance_from_core = data["distance_from_core"]
-    # nr_forwarding_channels = data["nr_forwarding_channels"]
 
     try:
         query_time = (
@@ -244,8 +238,6 @@ def handler(context, event):
             "id": chat.id,
             "collection_priority": prio,
             "language_code": lang_code,
-            # 'distance_from_core': distance_from_core,
-            # 'nr_forwarding_channels': nr_forwarding_channels,
         }
         update_postgres(connection, update_d)
 

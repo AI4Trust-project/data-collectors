@@ -83,13 +83,12 @@ def handler(context, event):
 
     if scraped_article:
 
-        scraped_article["unscraped_data"] = approved_article
-
         img_hash = hash_image(scraped_article["image_url"])
         scraped_article["image_hash"] = img_hash
 
         # add adcional info
         scraped_article["table"] = "news-scraped"
+        scraped_article["fetched_id"] = approved_article.get("fetched_id", "None")
         scraped_article["data_owner"] = approved_article.get("data_owner", "FBK-NEWS")
         scraped_article["created_at"] = approved_article.get(
             "created_at",

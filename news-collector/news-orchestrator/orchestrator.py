@@ -47,8 +47,8 @@ def handler(context, event):
 
         # start_date = datetime.now() - timedelta(days=365 * 5) # 5 years ago
 
-        start_date = datetime.now()
-        end_date = datetime.now() - timedelta(days=2)  # 2 days ago
+        end_date = datetime.now()
+        start_date = datetime.now() - timedelta(days=2)  # 2 days ago
 
         start_date_str = start_date.strftime("%Y-%m-%d")
         end_date_str = end_date.strftime("%Y-%m-%d")

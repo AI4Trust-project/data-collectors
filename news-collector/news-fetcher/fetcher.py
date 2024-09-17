@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from datetime import datetime, timezone
 
 from gdeltdoc import Filters, GdeltDoc
@@ -52,25 +53,35 @@ def handler(context, event):
 
         fetched_articles = fetch_articles(search_parameters)
 
+        search_parameters["table"] = "news-search"
+        search_parameters["total_results"] = (
+            len(fetched_articles) if fetched_articles else 0
+        )
+
+        # insert search in iceberg
+        producer.send("collected_metadata", value=article_json)
+
         for _, row in fetched_articles.iterrows():
             try:
                 article_message = row.to_dict()
-                article_message["search_parameters"] = search_parameters
                 article_message["search_date"] = datetime.now().strftime("%Y-%m-%d")
 
                 # add adcional info
-                article_json["table"] = "news-fetched"
-                article_json["data_owner"] = search_parameters.get(
+                article_message["table"] = "news-fetched"
+                article_message["data_owner"] = search_parameters.get(
                     "data_owner", "FBK-NEWS"
                 )
-                article_json["created_at"] = search_parameters.get(
+                article_message["created_at"] = search_parameters.get(
                     "created_at",
                     datetime.now()
                     .astimezone(timezone.utc)
                     .strftime("%Y-%m-%dT%H:%M:%SZ"),
                 )
-                article_json["search_id"] = search_parameters.get("search_id", "None")
-                article_json["keyword"] = search_parameters.get("keyword", "None")
+                article_message["search_id"] = search_parameters.get(
+                    "search_id", "None"
+                )
+                article_message["keyword"] = search_parameters.get("keyword", "None")
+                article_message["fetched_id"] = str(uuid.uuid4())
 
                 article_json = json.dumps(article_message)
 

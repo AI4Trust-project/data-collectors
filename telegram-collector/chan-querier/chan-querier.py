@@ -225,7 +225,9 @@ def handler(context, event):
             for c in collegram.channels.get_recommended(client, chat)
         }
         for rec_id, rec_hash in recommended_chans.items():
-            handle_recommended(rec_id, rec_hash, connection, distance_from_core, producer)
+            handle_recommended(
+                rec_id, rec_hash, connection, distance_from_core, producer
+            )
         channel_full_d["recommended_channels"] = list(recommended_chans.keys())
 
         for content_type, f in collegram.messages.MESSAGE_CONTENT_TYPE_MAP.items():
@@ -238,8 +240,11 @@ def handler(context, event):
             "id": chat.id,
             "collection_priority": prio,
             "language_code": lang_code,
+            "created_at": chat.date,
+            "nr_participants": chat.participants_count,
+            "nr_messages": channel_full_d["message_count"],
         }
-        update_postgres(connection, update_d)
+        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
         channel_full_d = collegram.channels.anon_full_dict(
             channel_full_d,

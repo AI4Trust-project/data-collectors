@@ -94,6 +94,7 @@ def handle_new_forward(fwd_id, client, connection, pred_dist_from_core, producer
             "id": fwd_id,
             "access_hash": fwd_hash,
             "data_owner": os.environ["TELEGRAM_OWNER"],
+            "distance_from_core": insert_d["distance_from_core"],
         }
         producer.send("chans_to_query", value=m)
 

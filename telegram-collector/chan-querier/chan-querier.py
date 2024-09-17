@@ -90,6 +90,41 @@ def get_priority(lang_code, lang_prios):
     return lang_prios.get(lang_code, 0)
 
 
+def handle_recommended(rec_id, rec_hash, connection, pred_dist_from_core, producer):
+    with connection.cursor() as cur:
+        cur.execute(
+            f"SELECT nr_recommending_channels, distance_from_core FROM channels_to_query WHERE id = {rec_id}"
+        )
+        prio_info = cur.fetchone()
+
+    if prio_info is None:
+        insert_d = {
+            "id": rec_id,
+            "access_hash": rec_hash,
+            "data_owner": os.environ["TELEGRAM_OWNER"],
+            "nr_recommending_channels": 1,
+            "distance_from_core": pred_dist_from_core + 1,
+        }
+        collegram.utils.insert_into_postgres(connection, "channels_to_query", insert_d)
+        m = {
+            "id": rec_id,
+            "access_hash": rec_hash,
+            "data_owner": os.environ["TELEGRAM_OWNER"],
+        }
+        producer.send("chans_to_query", value=m)
+
+    else:
+        (nr_recommending, distance_from_core) = prio_info
+        update_d = {
+            "id": rec_id,
+            "nr_recommending_channels": nr_recommending + 1,
+            "distance_from_core": min(pred_dist_from_core + 1, distance_from_core),
+            # TODO
+            # "priority": 0,
+        }
+        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+
+
 def handler(context, event):
     nest_asyncio.apply()
     # Keep, in future if we want to use more than 1 key, this is essential
@@ -109,7 +144,7 @@ def handler(context, event):
     channel_username = data.get("channel_username")
     # TODO: following to be set in `messages_querier` through an SQL update, whenever a
     # forwarded channel is found
-    # distance_from_core = data["distance_from_core"]
+    distance_from_core = data["distance_from_core"]
     # nr_forwarding_channels = data["nr_forwarding_channels"]
 
     try:
@@ -195,7 +230,8 @@ def handler(context, event):
             c.id: c.access_hash
             for c in collegram.channels.get_recommended(client, chat)
         }
-        # TODO: add into `channels_to_query`, or update, incrementing `nr_channels_recommended_in`
+        for rec_id, rec_hash in recommended_chans.items():
+            handle_recommended(rec_id, rec_hash, connection, distance_from_core, producer)
         channel_full_d["recommended_channels"] = list(recommended_chans.keys())
 
         for content_type, f in collegram.messages.MESSAGE_CONTENT_TYPE_MAP.items():

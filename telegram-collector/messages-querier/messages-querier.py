@@ -60,10 +60,22 @@ async def init_context(context):
     setattr(context, "producer", producer)
 
 
-def handle_new_forward(fwd_id, client, connection, pred_dist_from_core, producer):
+def handle_new_forward(
+    fwd_id, client, connection, pred_dist_from_core, producer, lang_priorities
+):
     with connection.cursor() as cur:
         cur.execute(
-            f"SELECT nr_forwarding_channels, distance_from_core FROM channels_to_query WHERE id = {fwd_id}"
+            "SELECT"
+            " created_at,"
+            " channel_last_queried_at,"
+            " language_code"
+            " nr_participants,"
+            " nr_messages,"
+            " nr_forwarding_channels,"
+            " nr_recommending_channels,"
+            " distance_from_core,"
+            " FROM channels_to_query"
+            f" WHERE id = {fwd_id}"
         )
         prio_info = cur.fetchone()
 
@@ -90,22 +102,37 @@ def handle_new_forward(fwd_id, client, connection, pred_dist_from_core, producer
             "distance_from_core": pred_dist_from_core + 1,
         }
         collegram.utils.insert_into_postgres(connection, "channels_to_query", insert_d)
-        m = {
-            "id": fwd_id,
-            "access_hash": fwd_hash,
-            "data_owner": os.environ["TELEGRAM_OWNER"],
-            "distance_from_core": insert_d["distance_from_core"],
-        }
-        producer.send("chans_to_query", value=m)
+        producer.send("chans_to_query", value=insert_d)
 
     else:
-        (nr_forwarding, distance_from_core) = prio_info
+        (
+            created_at,
+            channel_last_queried_at,
+            language_code,
+            participants_count,
+            messages_count,
+            nr_forwarding_channels,
+            nr_recommending_channels,
+            distance_from_core,
+        ) = prio_info
+        new_dist_from_core = min(pred_dist_from_core + 1, distance_from_core)
+        lifespan_seconds = (created_at - channel_last_queried_at).total_seconds()
+        priority = collegram.channels.get_explo_priority(
+            language_code,
+            messages_count,
+            participants_count,
+            lifespan_seconds,
+            new_dist_from_core,
+            nr_forwarding_channels,
+            nr_recommending_channels + 1,
+            lang_priorities,
+            acty_slope=5,
+        )
         update_d = {
             "id": fwd_id,
-            "nr_forwarding_channels": nr_forwarding + 1,
-            "distance_from_core": min(pred_dist_from_core + 1, distance_from_core),
-            # TODO
-            # "priority": 0,
+            "nr_forwarding_channels": nr_forwarding_channels + 1,
+            "distance_from_core": new_dist_from_core,
+            "priority": priority,
         }
         collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
@@ -153,6 +180,12 @@ async def collect_messages(
 
 def handler(context, event):
     nest_asyncio.apply()
+    # Set relative priority for project's languages. Since the language detection is
+    # surely not 100% reliable, have to allow for popular channels not detected as using
+    # these to be collectable.
+    lang_priorities = {
+        lc: 1e-3 for lc in ["EN", "FR", "ES", "DE", "EL", "IT", "PL", "RO"]
+    }
 
     # TODO: handle passing forwards to "previous" component + anon vs non anon ID in data
     fs = context.fs
@@ -283,6 +316,13 @@ def handler(context, event):
 
             for fwd_id in new_fwds:
                 forwarded_chans.add(fwd_id)
-                handle_new_forward(fwd_id, client, connection, dist_from_core, producer)
+                handle_new_forward(
+                    fwd_id,
+                    client,
+                    connection,
+                    dist_from_core,
+                    producer,
+                    lang_priorities,
+                )
 
     # TODO: say we're done

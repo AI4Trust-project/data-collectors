@@ -60,40 +60,23 @@ async def init_context(context):
     setattr(context, "producer", producer)
 
 
-def update_postgres(conn, channel_update_params: dict):
-    cur = None
-    try:
-        cur = conn.cursor()
-        query = "UPDATE channels_to_query SET collection_priority = %s, language_code = %s WHERE id = %s"
-        cur.execute(
-            query,
-            (
-                channel_update_params["collection_priority"],
-                channel_update_params["language_code"],
-                channel_update_params["id"],
-            ),
-        )
-
-        # commit the changes to the database
-        conn.commit()
-
-    except Exception as e:
-        print("ERROR UPDATING channels_to_query")
-        print(e)
-        cur.execute("ROLLBACK")
-        conn.commit()
-    finally:
-        cur.close()
-
-
-def get_priority(lang_code, lang_prios):
-    return lang_prios.get(lang_code, 0)
-
-
-def handle_recommended(rec_id, rec_hash, connection, pred_dist_from_core, producer):
+def handle_recommended(
+    rec_id, rec_hash, connection, pred_dist_from_core, producer, lang_priorities
+):
     with connection.cursor() as cur:
+        # TODO: same in messages querier?
         cur.execute(
-            f"SELECT nr_recommending_channels, distance_from_core FROM channels_to_query WHERE id = {rec_id}"
+            "SELECT"
+            " created_at,"
+            " channel_last_queried_at,"
+            " language_code"
+            " nr_participants,"
+            " nr_messages,"
+            " nr_forwarding_channels,"
+            " nr_recommending_channels,"
+            " distance_from_core,"
+            " FROM channels_to_query"
+            f" WHERE id = {rec_id}"
         )
         prio_info = cur.fetchone()
 
@@ -106,21 +89,37 @@ def handle_recommended(rec_id, rec_hash, connection, pred_dist_from_core, produc
             "distance_from_core": pred_dist_from_core + 1,
         }
         collegram.utils.insert_into_postgres(connection, "channels_to_query", insert_d)
-        m = {
-            "id": rec_id,
-            "access_hash": rec_hash,
-            "data_owner": os.environ["TELEGRAM_OWNER"],
-        }
-        producer.send("chans_to_query", value=m)
+        producer.send("chans_to_query", value=insert_d)
 
     else:
-        (nr_recommending, distance_from_core) = prio_info
+        (
+            created_at,
+            channel_last_queried_at,
+            language_code,
+            participants_count,
+            messages_count,
+            nr_forwarding_channels,
+            nr_recommending_channels,
+            distance_from_core,
+        ) = prio_info
+        new_dist_from_core = min(pred_dist_from_core + 1, distance_from_core)
+        lifespan_seconds = (created_at - channel_last_queried_at).total_seconds()
+        priority = collegram.channels.get_explo_priority(
+            language_code,
+            messages_count,
+            participants_count,
+            lifespan_seconds,
+            new_dist_from_core,
+            nr_forwarding_channels,
+            nr_recommending_channels + 1,
+            lang_priorities,
+            acty_slope=5,
+        )
         update_d = {
             "id": rec_id,
-            "nr_recommending_channels": nr_recommending + 1,
-            "distance_from_core": min(pred_dist_from_core + 1, distance_from_core),
-            # TODO
-            # "priority": 0,
+            "nr_recommending_channels": nr_recommending_channels + 1,
+            "distance_from_core": new_dist_from_core,
+            "priority": priority,
         }
         collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
@@ -129,6 +128,12 @@ def handler(context, event):
     nest_asyncio.apply()
     # Keep, in future if we want to use more than 1 key, this is essential
     key_name = os.environ["TELEGRAM_OWNER"]
+    # Set relative priority for project's languages. Since the language detection is
+    # surely not 100% reliable, have to allow for popular channels not detected as using
+    # these to be collectable.
+    lang_priorities = {
+        lc: 1e-3 for lc in ["EN", "FR", "ES", "DE", "EL", "IT", "PL", "RO"]
+    }
 
     fs = context.fs
     producer = context.producer
@@ -139,7 +144,9 @@ def handler(context, event):
     channel_id = data["id"]
     access_hash = data["access_hash"]
     channel_username = data.get("channel_username")
-    distance_from_core = data["distance_from_core"]
+    distance_from_core = data.get("distance_from_core", 0)
+    nr_forwarding_channels = data.get("nr_forwarding_channels", 0)
+    nr_recommending_channels = data.get("nr_recommending_channels", 0)
 
     try:
         query_time = (
@@ -185,7 +192,6 @@ def handler(context, event):
 
     anonymiser = collegram.utils.HMAC_anonymiser(save_func=insert_anon_pair)
 
-    lang_priorities = {lc: 1 for lc in ["EN", "FR", "ES", "DE", "EL", "IT", "PL", "RO"]}
     lang_detector = LanguageDetectorBuilder.from_all_languages().build()
 
     # Order chats such that one corresponding to channel_full is first, so we don't
@@ -226,7 +232,12 @@ def handler(context, event):
         }
         for rec_id, rec_hash in recommended_chans.items():
             handle_recommended(
-                rec_id, rec_hash, connection, distance_from_core, producer
+                rec_id,
+                rec_hash,
+                connection,
+                distance_from_core,
+                producer,
+                lang_priorities,
             )
         channel_full_d["recommended_channels"] = list(recommended_chans.keys())
 
@@ -235,7 +246,18 @@ def handler(context, event):
             channel_full_d[f"{content_type}_count"] = count
 
         lang_code = collegram.text.detect_chan_lang(channel_full_d, lang_detector)
-        prio = get_priority(lang_code, lang_priorities)
+        lifespan_seconds = (chat.date - query_time).total_seconds()
+        prio = collegram.channels.get_explo_priority(
+            lang_code,
+            channel_full_d["message_count"],
+            channel_full_d["nr_participants"],
+            lifespan_seconds,
+            distance_from_core,
+            nr_forwarding_channels,
+            nr_recommending_channels,
+            lang_priorities,
+            acty_slope=5,
+        )
         update_d = {
             "id": chat.id,
             "collection_priority": prio,

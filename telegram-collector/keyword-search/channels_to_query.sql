@@ -14,5 +14,5 @@ CREATE TABLE channels_to_query(
     nr_forwarding_channels INT DEFAULT 0,
     nr_recommending_channels INT DEFAULT 0,
     distance_from_core INT DEFAULT 0,
-    collection_priority INT
+    collection_priority NUMERIC(7, 6)
 );

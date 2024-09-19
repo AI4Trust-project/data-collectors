@@ -266,7 +266,7 @@ def handler(context, event):
 
     dataOwner = "FBK-YOUTUBE"
 
-    # data = json.loads(event.body.decode("utf-8"))
+    query_uuid = str(uuid.uuid4())
 
     keywords = get_keywords(context=context)
 
@@ -279,7 +279,6 @@ def handler(context, event):
         keywordId,
     ) in keywords:
 
-        query_uuid = str(uuid.uuid4())
         path = generate_folder(
             "yt_search.{}".format(query_uuid),
             bucket_name,

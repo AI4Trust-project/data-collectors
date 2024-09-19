@@ -84,7 +84,7 @@ def handler(context, event):
     if scraped_article:
 
         img_hash = hash_image(scraped_article["image_url"])
-        scraped_article["image_hash"] = img_hash
+        scraped_article["image_hash"] = "md5:" + str(img_hash)
 
         # add adcional info
         scraped_article["table"] = "news-scraped"

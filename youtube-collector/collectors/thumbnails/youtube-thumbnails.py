@@ -163,7 +163,7 @@ def handler(context, event):
         "resultsPath": image_name,
         "keywordId": data["keywordId"],
         "producer": data["producer"],
-        "hash": h,
+        "hash": "sha1:" + str(h),
     }
 
     # inser psql

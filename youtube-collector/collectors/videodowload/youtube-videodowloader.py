@@ -183,7 +183,7 @@ def handler(context, event):
             "resultsPath": object_name,
             "keywordId": data["keywordId"],
             "producer": data["producer"],
-            "hash": h,
+            "hash": "sha1:" + str(h),
         }
 
         insert_into_psql(search_info, context.conn)

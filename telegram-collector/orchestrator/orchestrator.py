@@ -33,7 +33,7 @@ def handler(context, event):
         cur.execute(
             "SELECT id, access_hash, distance_from_core"
             " FROM channels_to_query"
-            " ORDER BY collection_priority DESC"
+            " ORDER BY collection_priority ASC"
             " LIMIT 1"
         )
         chan_to_query = cur.fetchone()

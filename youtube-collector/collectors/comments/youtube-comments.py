@@ -17,7 +17,6 @@ def init_context(context):
         os.environ.get("MINIO_HOME"),
         access_key=os.environ.get("MINIO_ACCESS_KEY"),
         secret_key=os.environ.get("MINIO_SECRET_KEY"),
-        secure=False,
     )
 
     producer = KafkaProducer(
@@ -285,12 +284,12 @@ def handler(context, event):
             tmp.close()
 
             # insert comments on iceberg
-            insert_comments(
-                video_response=comment_threads,
-                search_info=search_info,
-                file_name=object_name,
-                context=context,
-            )
+            # insert_comments(
+            #     video_response=comment_threads,
+            #     search_info=search_info,
+            #     file_name=object_name,
+            #     context=context,
+            # )
 
             if "nextPageToken" in comment_threads.keys():
                 nxPage = comment_threads["nextPageToken"]

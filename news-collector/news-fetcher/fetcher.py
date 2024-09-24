@@ -36,7 +36,7 @@ def gdelt_fetcher(search_parameters):
         return fetched_articles
     except Exception as e:
         print(f"Error fetching articles: {e}")
-        return None
+        return e
 
 
 def fetch_articles(search_parameters):
@@ -54,12 +54,9 @@ def handler(context, event):
         fetched_articles = fetch_articles(search_parameters)
 
         search_parameters["table"] = "news-search"
-        search_parameters["total_results"] = (
-            len(fetched_articles) if fetched_articles else 0
-        )
 
         # insert search in iceberg
-        producer.send("collected_metadata", value=article_json)
+        producer.send("collected_news", value=json.loads(json.dumps(search_parameters)))
 
         for _, row in fetched_articles.iterrows():
             try:
@@ -83,12 +80,12 @@ def handler(context, event):
                 article_message["keyword"] = search_parameters.get("keyword", "None")
                 article_message["fetched_id"] = str(uuid.uuid4())
 
-                article_json = json.dumps(article_message)
+                article_json = json.loads(json.dumps(article_message))
 
                 producer.send("fetched_articles", value=article_json)
 
                 # save in iceberg
-                producer.send("collected_metadata", value=article_json)
+                producer.send("collected_news", value=article_json)
             except Exception as e:
                 print(e)
                 continue

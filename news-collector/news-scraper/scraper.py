@@ -97,4 +97,4 @@ def handler(context, event):
         scraped_article["search_id"] = approved_article.get("search_id", "None")
         scraped_article["keyword"] = approved_article.get("keyword", "None")
 
-        producer.send("collected_metadata", value=json.dumps(scraped_article))
+        producer.send("collected_news", value=json.loads(json.dumps(scraped_article)))

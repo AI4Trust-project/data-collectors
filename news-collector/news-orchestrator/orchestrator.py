@@ -69,4 +69,4 @@ def handler(context, event):
             "repeat": repeat,
         }
 
-        producer.send("search_parameters", value=json.dumps(message))
+        producer.send("search_parameters", value=json.loads(json.dumps(message)))

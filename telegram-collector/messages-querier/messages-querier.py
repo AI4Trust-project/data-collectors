@@ -73,7 +73,7 @@ def handle_new_forward(
             " nr_messages,"
             " nr_forwarding_channels,"
             " nr_recommending_channels,"
-            " distance_from_core,"
+            " distance_from_core"
             " FROM channels_to_query"
             f" WHERE id = {fwd_id}"
         )

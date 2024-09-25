@@ -36,7 +36,7 @@ def gdelt_fetcher(search_parameters):
         return fetched_articles
     except Exception as e:
         print(f"Error fetching articles: {e}")
-        return e
+        return None
 
 
 def fetch_articles(search_parameters):
@@ -52,6 +52,11 @@ def handler(context, event):
         search_parameters = json.loads(event.body.decode("utf-8"))
 
         fetched_articles = fetch_articles(search_parameters)
+
+        if fetched_articles is not None:
+            search_parameters["n_results"] = len(fetched_articles)
+        else:
+            search_parameters["n_results"] = 0
 
         search_parameters["table"] = "news-search"
 
@@ -77,6 +82,7 @@ def handler(context, event):
                 article_message["search_id"] = search_parameters.get(
                     "search_id", "None"
                 )
+                article_message["keyword_id"] = search_parameters.get("keyword_id", "None")
                 article_message["keyword"] = search_parameters.get("keyword", "None")
                 article_message["fetched_id"] = str(uuid.uuid4())
 

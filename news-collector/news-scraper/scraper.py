@@ -95,6 +95,7 @@ def handler(context, event):
             datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
         scraped_article["search_id"] = approved_article.get("search_id", "None")
+        scraped_article["keyword_id"] = approved_article.get("keyword_id", "None")
         scraped_article["keyword"] = approved_article.get("keyword", "None")
 
         producer.send("collected_news", value=json.loads(json.dumps(scraped_article)))

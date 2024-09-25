@@ -250,7 +250,7 @@ def handler(context, event):
         prio = collegram.channels.get_explo_priority(
             lang_code,
             channel_full_d["message_count"],
-            channel_full_d["nr_participants"],
+            chat.participants_count,
             lifespan_seconds,
             distance_from_core,
             nr_forwarding_channels,

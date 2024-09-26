@@ -258,6 +258,7 @@ def handler(context, event):
         )
         update_d = {
             "id": chat.id,
+            "username": chat.username,
             "collection_priority": prio,
             "language_code": lang_code,
             "created_at": chat.date,

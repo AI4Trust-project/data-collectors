@@ -70,7 +70,7 @@ def handle_recommended(
             "SELECT"
             " created_at,"
             " channel_last_queried_at,"
-            " language_code"
+            " language_code,"
             " nr_participants,"
             " nr_messages,"
             " nr_forwarding_channels,"

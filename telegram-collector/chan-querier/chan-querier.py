@@ -17,6 +17,7 @@ from telethon.errors import (
     UsernameInvalidError,
 )
 from telethon.sessions import StringSession
+from telethon.tl.tlobject import _json_default
 
 
 async def init_context(context):
@@ -55,7 +56,7 @@ async def init_context(context):
     broker = os.environ.get("KAFKA_BROKER")
     producer = KafkaProducer(
         bootstrap_servers=broker,
-        value_serializer=lambda x: json.dumps(x).encode("utf-8"),
+        value_serializer=lambda x: json.dumps(x, default=_json_default).encode("utf-8"),
     )
     setattr(context, "producer", producer)
 
@@ -283,5 +284,5 @@ def handler(context, event):
         query_info["channel_id"] = chat.id
         chan_paths = collegram.paths.ChannelPaths(chat.id, paths)
         query_info["result_path"] = str(chan_paths.channel.absolute())
-        m = json.loads(json.dumps(query_info))
+        m = json.loads(json.dumps(query_info, default=_json_default))
         producer.send("telegram_collected_metadata", value=m)

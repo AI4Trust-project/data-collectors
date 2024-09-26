@@ -3,6 +3,7 @@ import os
 
 import psycopg
 from kafka import KafkaProducer
+from telethon.tl.tlobject import _json_default
 
 
 def init_context(context):
@@ -18,7 +19,7 @@ def init_context(context):
     broker = os.environ.get("KAFKA_BROKER")
     producer = KafkaProducer(
         bootstrap_servers=broker,
-        value_serializer=lambda x: json.dumps(x).encode("utf-8"),
+        value_serializer=lambda x: json.dumps(x, default=_json_default).encode("utf-8"),
     )
     setattr(context, "producer", producer)
 

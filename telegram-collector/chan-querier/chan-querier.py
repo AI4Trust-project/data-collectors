@@ -125,7 +125,7 @@ def handle_recommended(
                 lang_priorities,
                 acty_slope=5,
             )
-            update_d["priority"] = priority
+            update_d["collection_priority"] = priority
 
         collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 

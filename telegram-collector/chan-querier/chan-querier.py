@@ -152,7 +152,6 @@ def handler(context, event):
         query_time = (
             datetime.datetime.now()
             .astimezone(datetime.timezone.utc)
-            .strftime("%Y-%m-%dT%H:%M:%SZ")
         )
         channel_full = collegram.channels.get_full(
             client,
@@ -204,7 +203,6 @@ def handler(context, event):
             query_time = (
                 datetime.datetime.now()
                 .astimezone(datetime.timezone.utc)
-                .strftime("%Y-%m-%dT%H:%M:%SZ")
             )
             channel_full = collegram.channels.get_full(
                 client,
@@ -246,7 +244,7 @@ def handler(context, event):
             channel_full_d[f"{content_type}_count"] = count
 
         lang_code = collegram.text.detect_chan_lang(channel_full_d, lang_detector)
-        lifespan_seconds = (chat.date.replace(tzinfo=None) - datetime.datetime.strptime(query_time, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=None)).total_seconds()
+        lifespan_seconds = (chat.date.replace(tzinfo=None) - query_time.replace(tzinfo=None)).total_seconds()
         prio = collegram.channels.get_explo_priority(
             lang_code,
             channel_full_d["message_count"],

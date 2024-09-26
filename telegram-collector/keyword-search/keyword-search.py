@@ -139,7 +139,6 @@ def handler(context, event):
                     date = (
                         datetime.datetime.now()
                         .astimezone(timezone.utc)
-                        .strftime("%Y-%m-%dT%H:%M:%SZ")
                     )
                     query_uuid = str(uuid.uuid4())
                     api_chans = collegram.channels.search_from_api(client, kw)

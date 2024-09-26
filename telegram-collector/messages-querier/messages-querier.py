@@ -240,7 +240,7 @@ def handler(context, event):
         datetime.datetime.now(datetime.timezone.utc)
         # - datetime.timedelta(days=30)
     )
-    query_time = global_dt_to.strftime("%Y-%m-%dT%H:%M:%SZ")
+    query_time = global_dt_to
     update_d = {"id": channel_id, "messages_last_queried_at": query_time}
     collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
@@ -280,7 +280,6 @@ def handler(context, event):
             query_time = (
                 datetime.datetime.now()
                 .astimezone(datetime.timezone.utc)
-                .strftime("%Y-%m-%dT%H:%M:%SZ")
             )
             query_info = {
                 "query_id": str(uuid.uuid4()),

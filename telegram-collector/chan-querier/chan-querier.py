@@ -104,24 +104,29 @@ def handle_recommended(
             distance_from_core,
         ) = prio_info
         new_dist_from_core = min(pred_dist_from_core + 1, distance_from_core)
-        lifespan_seconds = (created_at - channel_last_queried_at).total_seconds()
-        priority = collegram.channels.get_explo_priority(
-            language_code,
-            messages_count,
-            participants_count,
-            lifespan_seconds,
-            new_dist_from_core,
-            nr_forwarding_channels,
-            nr_recommending_channels + 1,
-            lang_priorities,
-            acty_slope=5,
-        )
         update_d = {
             "id": rec_id,
             "nr_recommending_channels": nr_recommending_channels + 1,
             "distance_from_core": new_dist_from_core,
-            "priority": priority,
         }
+
+        # If channel has already been queried by `chan-querier`, then recompute
+        # priority.
+        if channel_last_queried_at is not None:
+            lifespan_seconds = (created_at - channel_last_queried_at).total_seconds()
+            priority = collegram.channels.get_explo_priority(
+                language_code,
+                messages_count,
+                participants_count,
+                lifespan_seconds,
+                new_dist_from_core,
+                nr_forwarding_channels,
+                nr_recommending_channels + 1,
+                lang_priorities,
+                acty_slope=5,
+            )
+            update_d["priority"] = priority
+
         collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
 

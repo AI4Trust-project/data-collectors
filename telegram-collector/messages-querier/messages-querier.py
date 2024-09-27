@@ -133,8 +133,8 @@ def handle_new_forward(
                 participants_count,
                 lifespan_seconds,
                 new_dist_from_core,
-                nr_forwarding_channels,
-                nr_recommending_channels + 1,
+                nr_forwarding_channels + 1,
+                nr_recommending_channels,
                 lang_priorities,
                 acty_slope=5,
             )
@@ -283,10 +283,7 @@ def handler(context, event):
                 if last_message_saved:
                     offset_id = collegram.json.read_message(last_message_saved).id
 
-            query_time = (
-                datetime.datetime.now()
-                .astimezone(datetime.timezone.utc)
-            )
+            query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
             query_info = {
                 "query_id": str(uuid.uuid4()),
                 "query_date": query_time,
@@ -318,7 +315,6 @@ def handler(context, event):
             producer.send("telegram_collected_metadata", value=m)
 
             new_fwds = chunk_fwds.difference(forwarded_chans)
-
             for fwd_id in new_fwds:
                 forwarded_chans.add(fwd_id)
                 handle_new_forward(

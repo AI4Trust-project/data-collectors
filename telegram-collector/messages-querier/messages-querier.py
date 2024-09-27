@@ -61,6 +61,7 @@ async def init_context(context):
     setattr(context, "producer", producer)
 
 
+# TODO: handle new linked chan
 def handle_new_forward(
     fwd_id, client, connection, pred_dist_from_core, producer, lang_priorities
 ):
@@ -87,7 +88,7 @@ def handle_new_forward(
             )
         except ChannelPrivateError:
             # These channels are valid and have been seen for sure,
-            # might be private though.
+            # might be private though. TODO: keep track of private channels!
             return
         except (ChannelInvalidError, ValueError):
             # This should happen extremely rarely, still haven't figured
@@ -106,6 +107,8 @@ def handle_new_forward(
         producer.send("chans_to_query", value=insert_d)
 
     else:
+        # TODO: handle case in which previous message collection already found this
+        # channel
         (
             created_at,
             channel_last_queried_at,

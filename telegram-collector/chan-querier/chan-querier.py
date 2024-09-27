@@ -65,7 +65,6 @@ def handle_recommended(
     rec_id, rec_hash, connection, pred_dist_from_core, producer, lang_priorities
 ):
     with connection.cursor() as cur:
-        # TODO: same in messages querier?
         cur.execute(
             "SELECT"
             " created_at,"
@@ -75,6 +74,7 @@ def handle_recommended(
             " nr_messages,"
             " nr_forwarding_channels,"
             " nr_recommending_channels,"
+            " nr_linking_channels,"
             " distance_from_core"
             " FROM channels_to_query"
             f" WHERE id = {rec_id}"
@@ -101,6 +101,7 @@ def handle_recommended(
             messages_count,
             nr_forwarding_channels,
             nr_recommending_channels,
+            nr_linking_channels,
             distance_from_core,
         ) = prio_info
         new_dist_from_core = min(pred_dist_from_core + 1, distance_from_core)
@@ -122,6 +123,7 @@ def handle_recommended(
                 new_dist_from_core,
                 nr_forwarding_channels,
                 nr_recommending_channels + 1,
+                nr_linking_channels,
                 lang_priorities,
                 acty_slope=5,
             )
@@ -131,6 +133,7 @@ def handle_recommended(
 
 
 def handler(context, event):
+    # Triggered by chans_to_query
     nest_asyncio.apply()
     # Keep, in future if we want to use more than 1 key, this is essential
     key_name = os.environ["TELEGRAM_OWNER"]
@@ -147,12 +150,13 @@ def handler(context, event):
     connection = context.connection
 
     data = json.loads(event.body.decode("utf-8"))
-    channel_id = data["id"]
-    access_hash = data["access_hash"]
-    channel_username = data.get("channel_username")
+    channel_id = data.get("id")
+    access_hash = data.get("access_hash")
+    channel_username = data.get("username")
     distance_from_core = data.get("distance_from_core", 0)
     nr_forwarding_channels = data.get("nr_forwarding_channels", 0)
     nr_recommending_channels = data.get("nr_recommending_channels", 0)
+    nr_linking_channels = data.get("nr_linking_channels", 0)
 
     try:
         query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
@@ -162,6 +166,7 @@ def handler(context, event):
             channel_id=channel_id,
             access_hash=access_hash,
         )
+        channel_id = channel_full.full_chat.id
     except (
         ChannelInvalidError,
         ChannelPrivateError,
@@ -255,6 +260,7 @@ def handler(context, event):
             distance_from_core,
             nr_forwarding_channels,
             nr_recommending_channels,
+            nr_linking_channels,
             lang_priorities,
             acty_slope=5,
         )

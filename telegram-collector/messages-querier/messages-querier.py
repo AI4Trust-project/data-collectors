@@ -18,7 +18,7 @@ from telethon.errors import (
 )
 from telethon.sessions import StringSession
 from telethon.tl.tlobject import _json_default
-from telethon.types import MessageService
+from telethon.types import InputPeerChannel, MessageService
 
 
 async def init_context(context):
@@ -61,7 +61,118 @@ async def init_context(context):
     setattr(context, "producer", producer)
 
 
-# TODO: handle new linked chan
+def get_input_chan(
+    client,
+    channel_username: str | None = None,
+    channel_id: int | None = None,
+    access_hash: int | None = None,
+):
+    try:
+        fwd_input_peer_channel = collegram.channels.get_input_peer(
+            client, channel_username, channel_id, access_hash
+        )
+        return fwd_input_peer_channel
+    except ChannelPrivateError:
+        # These channels are valid and have been seen for sure,
+        # might be private though. TODO: keep track of private channels!
+        return
+    except (ChannelInvalidError, UsernameInvalidError, ValueError):
+        # This should happen extremely rarely, still haven't figured
+        # out conditions under which it does.
+        return
+
+
+def handle_new_linked_chan(
+    linked_username, client, connection, pred_dist_from_core, producer, lang_priorities
+):
+    base_query = (
+        "SELECT"
+        " id,"
+        " created_at,"
+        " channel_last_queried_at,"
+        " language_code,"
+        " nr_participants,"
+        " nr_messages,"
+        " nr_forwarding_channels,"
+        " nr_recommending_channels,"
+        " nr_linking_channels,"
+        " distance_from_core"
+        " FROM channels_to_query"
+    )
+    with connection.cursor() as cur:
+        cur.execute(base_query + f" WHERE username = {linked_username}")
+        prio_info = cur.fetchone()
+
+    exists = prio_info is not None
+    if not exists:
+        input_peer_channel = get_input_chan(client, channel_username=linked_username)
+        if not isinstance(input_peer_channel, InputPeerChannel):
+            return
+
+        # Here there is a possibility the username changed, so check again the existence
+        # based on the ID.
+        with connection.cursor() as cur:
+            cur.execute(base_query + f" WHERE id = {input_peer_channel.channel_id}")
+            prio_info = cur.fetchone()
+
+        exists = prio_info is not None
+        if not exists:
+            insert_d = {
+                "id": input_peer_channel.channel_id,
+                "access_hash": input_peer_channel.access_hash,
+                "username": linked_username,
+                "data_owner": os.environ["TELEGRAM_OWNER"],
+                "nr_linking_channels": 1,
+                "distance_from_core": pred_dist_from_core + 1,
+            }
+            collegram.utils.insert_into_postgres(
+                connection, "channels_to_query", insert_d
+            )
+            producer.send("chans_to_query", value=insert_d)
+
+    if exists:
+        # TODO: handle case in which previous message collection already found this
+        # channel
+        (
+            channel_id,
+            created_at,
+            channel_last_queried_at,
+            language_code,
+            participants_count,
+            messages_count,
+            nr_forwarding_channels,
+            nr_recommending_channels,
+            nr_linking_channels,
+            distance_from_core,
+        ) = prio_info
+        new_dist_from_core = min(pred_dist_from_core + 1, distance_from_core)
+        update_d = {
+            "id": channel_id,
+            "nr_linking_channels": nr_linking_channels + 1,
+            "distance_from_core": new_dist_from_core,
+        }
+
+        # If channel has already been queried by `chan-querier`, then recompute
+        # priority.
+        if channel_last_queried_at is not None:
+            lifespan_seconds = (created_at - channel_last_queried_at).total_seconds()
+            priority = collegram.channels.get_explo_priority(
+                language_code,
+                messages_count,
+                participants_count,
+                lifespan_seconds,
+                new_dist_from_core,
+                nr_forwarding_channels,
+                nr_recommending_channels,
+                nr_linking_channels + 1,
+                lang_priorities,
+                acty_slope=5,
+            )
+            update_d["collection_priority"] = priority
+
+        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+
+
 def handle_new_forward(
     fwd_id, client, connection, pred_dist_from_core, producer, lang_priorities
 ):
@@ -75,6 +186,7 @@ def handle_new_forward(
             " nr_messages,"
             " nr_forwarding_channels,"
             " nr_recommending_channels,"
+            " nr_linking_channels,"
             " distance_from_core"
             " FROM channels_to_query"
             f" WHERE id = {fwd_id}"
@@ -82,19 +194,9 @@ def handle_new_forward(
         prio_info = cur.fetchone()
 
     if prio_info is None:
-        try:
-            fwd_input_peer_channel = collegram.channels.get_input_peer(
-                client, channel_id=fwd_id
-            )
-        except ChannelPrivateError:
-            # These channels are valid and have been seen for sure,
-            # might be private though. TODO: keep track of private channels!
+        fwd_input_peer_channel = get_input_chan(client, channel_id=fwd_id)
+        if fwd_input_peer_channel is None:
             return
-        except (ChannelInvalidError, ValueError):
-            # This should happen extremely rarely, still haven't figured
-            # out conditions under which it does.
-            return
-
         fwd_hash = fwd_input_peer_channel.access_hash
         insert_d = {
             "id": fwd_id,
@@ -117,6 +219,7 @@ def handle_new_forward(
             messages_count,
             nr_forwarding_channels,
             nr_recommending_channels,
+            nr_linking_channels,
             distance_from_core,
         ) = prio_info
         new_dist_from_core = min(pred_dist_from_core + 1, distance_from_core)
@@ -138,6 +241,7 @@ def handle_new_forward(
                 new_dist_from_core,
                 nr_forwarding_channels + 1,
                 nr_recommending_channels,
+                nr_linking_channels,
                 lang_priorities,
                 acty_slope=5,
             )
@@ -152,6 +256,7 @@ async def collect_messages(
     dt_from: datetime.datetime,
     dt_to: datetime.datetime,
     forwards_set: set[int],
+    linked_chans: set[str],
     anon_func,
     messages_save_path: Path,
     media_save_path: Path,
@@ -167,6 +272,7 @@ async def collect_messages(
             dt_from,
             dt_to,
             forwards_set,
+            linked_chans,
             anon_func,
             media_save_path,
             offset_id=offset_id,
@@ -205,7 +311,6 @@ def handler(context, event):
     data = json.loads(event.body.decode("utf-8"))
     channel_id = data["channel_id"]
     access_hash = data["access_hash"]
-    channel_username = data.get("channel_username")
     dist_from_core = data["distance_from_core"]
 
     data_path = Path("/telegram/")
@@ -215,27 +320,16 @@ def handler(context, event):
 
     full_chat_d = collegram.channels.load(channel_id, paths, fs=fs)
     chat_d = collegram.channels.get_matching_chat_from_full(full_chat_d, channel_id)
+    channel_username = chat_d.get("username")
     # TODO: following "dt_from" should be set by orchestrator, taking into account `messages_last_queried_at`
     dt_from = datetime.datetime.fromisoformat(data.get("dt_from", chat_d["date"]))
 
-    try:
-        input_chat = collegram.channels.get_input_peer(
-            client,
-            channel_username=channel_username,
-            channel_id=channel_id,
-            access_hash=access_hash,
-        )
-    except (
-        ChannelInvalidError,
-        ChannelPrivateError,
-        UsernameInvalidError,
-        ValueError,
-    ) as e:
-        # TODO What then?
-        # For all but ChannelPrivateError, can try with another key (TODO: add to
-        # list of new channels?).
-        # logger.warning(f"could not get data for listed channel {channel_id}")
-        raise e
+    input_chat = get_input_chan(
+        client,
+        channel_username=channel_username,
+        channel_id=channel_id,
+        access_hash=access_hash,
+    )
 
     def insert_anon_pair(original, anonymised):
         insert_d = {"original": original, "anonymised": anonymised}
@@ -258,11 +352,14 @@ def handler(context, event):
     )
 
     forwarded_chans = set()
+    linked_chans = {channel_username} if channel_username is not None else set()
+
     # Caution: the sorting only works because of file name format!
     existing_files = sorted(list(fs.glob(f"{chan_paths.messages}/*.jsonl")))
 
     for dt_from, dt_to in zip(dt_bin_edges[:-1], dt_bin_edges[1:]):
         chunk_fwds = set()
+        chunk_linked_chans = set()
         dt_from_in_path = dt_from.replace(
             day=1, hour=0, minute=0, second=0, microsecond=0
         ).date()
@@ -303,6 +400,7 @@ def handler(context, event):
                     dt_from,
                     dt_to,
                     chunk_fwds,
+                    chunk_linked_chans,
                     anonymiser.anonymise,
                     messages_save_path,
                     media_save_path,
@@ -322,6 +420,18 @@ def handler(context, event):
                 forwarded_chans.add(fwd_id)
                 handle_new_forward(
                     fwd_id,
+                    client,
+                    connection,
+                    dist_from_core,
+                    producer,
+                    lang_priorities,
+                )
+
+            new_linked_chans = chunk_linked_chans.difference(linked_chans)
+            for linked_un in new_linked_chans:
+                linked_chans.add(linked_un)
+                handle_new_linked_chan(
+                    linked_un,
                     client,
                     connection,
                     dist_from_core,

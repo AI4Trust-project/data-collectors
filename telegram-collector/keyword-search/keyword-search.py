@@ -128,7 +128,6 @@ def handler(context, event):
     client = context.client
     connection = context.connection
 
-    # TODO: Change to postgres
     kw_dir_path = Path("/telegram") / "keywords"
     for kw_fpath in fs.ls(str(kw_dir_path)):
         language_code = Path(kw_fpath).stem

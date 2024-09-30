@@ -3,6 +3,7 @@ import json
 import os
 import uuid
 from pathlib import Path
+from typing import Optional
 
 import collegram
 import fsspec
@@ -63,9 +64,9 @@ async def init_context(context):
 
 def get_input_chan(
     client,
-    channel_username: str | None = None,
-    channel_id: int | None = None,
-    access_hash: int | None = None,
+    channel_username: Optional[str] = None,
+    channel_id: Optional[int] = None,
+    access_hash: Optional[int] = None,
 ):
     try:
         fwd_input_peer_channel = collegram.channels.get_input_peer(

@@ -213,6 +213,8 @@ def handler(context, event):
                 client,
                 channel=chat,
             )
+            query_info["query_date"] = query_time
+            query_info["query_id"] = str(uuid.uuid4())
             update_d = {"id": channel_id, "channel_last_queried_at": query_time}
             collegram.utils.update_postgres(
                 connection, "channels_to_query", update_d, "id"

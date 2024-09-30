@@ -292,4 +292,5 @@ def handler(context, event):
         chan_paths = collegram.paths.ChannelPaths(chat.id, paths)
         query_info["result_path"] = str(chan_paths.channel.absolute())
         m = json.loads(json.dumps(query_info, default=_json_default))
+        m["table"] = "telegram-queries"
         producer.send("telegram_collected_metadata", value=m)

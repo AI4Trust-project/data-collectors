@@ -413,6 +413,7 @@ def handler(context, event):
 
             # Save metadata about the query itself
             m = json.loads(json.dumps(query_info, default=_json_default))
+            m["table"] = "telegram-queries"
             producer.send("telegram_collected_metadata", value=m)
 
             new_fwds = chunk_fwds.difference(forwarded_chans)

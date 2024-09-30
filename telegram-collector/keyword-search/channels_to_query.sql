@@ -1,5 +1,5 @@
 CREATE TABLE channels_to_query(
-    id INT PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     access_hash BIGINT NOT NULL,
     username VARCHAR(255),
     data_owner VARCHAR(255),

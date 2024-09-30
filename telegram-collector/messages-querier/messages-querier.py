@@ -101,7 +101,7 @@ def handle_new_linked_chan(
         " FROM channels_to_query"
     )
     with connection.cursor() as cur:
-        cur.execute(base_query + f" WHERE username = {linked_username}")
+        cur.execute(base_query + f" WHERE username = '{linked_username}'")
         prio_info = cur.fetchone()
 
     exists = prio_info is not None

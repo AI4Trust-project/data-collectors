@@ -1,9 +1,9 @@
-import json
+import datetime
 import os
 
+import collegram
 import psycopg
-from kafka import KafkaProducer
-from telethon.tl.tlobject import _json_default
+import psycopg.rows
 
 
 def init_context(context):
@@ -16,44 +16,21 @@ def init_context(context):
     )
     setattr(context, "connection", connection)
 
-    broker = os.environ.get("KAFKA_BROKER")
-    producer = KafkaProducer(
-        bootstrap_servers=broker,
-        value_serializer=lambda x: json.dumps(x, default=_json_default).encode("utf-8"),
-    )
-    setattr(context, "producer", producer)
-
 
 def handler(context, event):
-    producer = context.producer
+    # Periodic part of collection triggered by cron job, to get new messages from
+    # already-queried channels.
     connection = context.connection
 
-    with connection.cursor() as cur:
-        # TODO: also WHERE last_queried_at is inferior to some value
-        # in prio, take into account number of already high-priority of same language?
+    with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        dt_from = datetime.datetime.now().astimezone(
+            datetime.timezone.utc
+        ) - datetime.timedelta(days=1)
+        dt_from_str = dt_from.isoformat()
         cur.execute(
-            "SELECT id, access_hash, distance_from_core"
+            "SELECT id, access_hash, username, messages_last_queried_at, distance_from_core, collection_priority"
             " FROM channels_to_query"
-            " ORDER BY collection_priority ASC"
-            " LIMIT 1"
+            f" WHERE messages_last_queried_at < TIMESTAMP '{dt_from_str}'"
         )
-        chan_to_query = cur.fetchone()
-
-    # TODO: delete entry? or rather put flag / last queried at?
-    if chan_to_query is not None:
-        channel_id, access_hash, distance_from_core = chan_to_query
-        producer.send(
-            "chans_to_message",
-            value={
-                "channel_id": channel_id,
-                "access_hash": access_hash,
-                "distance_from_core": distance_from_core,
-            },
-        )
-
-        return {
-            "channel_id": channel_id,
-            "access_hash": access_hash,
-            "distance_from_core": distance_from_core,
-        }
-    # TODO: else?
+        for record in cur:
+            collegram.utils.insert_into_postgres(connection, "channels_to_requery", record)

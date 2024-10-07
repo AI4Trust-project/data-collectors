@@ -303,16 +303,35 @@ def handler(context, event):
         lc: 1e-3 for lc in ["EN", "FR", "ES", "DE", "EL", "IT", "PL", "RO"]
     }
 
-    # TODO: handle passing forwards to "previous" component + anon vs non anon ID in data
     fs = context.fs
     producer = context.producer
     client = context.client
     connection = context.connection
 
-    data = json.loads(event.body.decode("utf-8"))
-    channel_id = data["channel_id"]
-    access_hash = data["access_hash"]
-    dist_from_core = data["distance_from_core"]
+    query_fmt = (
+        "SELECT id, access_hash, username, messages_last_queried_at, distance_from_core"
+        " FROM {table}"
+        " ORDER BY collection_priority ASC"
+        " LIMIT 1"
+    )
+    with connection.cursor() as cur:
+        # First look for already-queried channel for which we need new messages
+        cur.execute(query_fmt.format(table='channel_to_requery'))
+        chan_to_query = cur.fetchone()
+
+        is_already_queried = chan_to_query is not None
+
+        if not is_already_queried:
+            # If there is none, query a new one.
+            cur.execute(query_fmt.format(table='channels_to_query'))
+            chan_to_query = cur.fetchone()
+            if chan_to_query is None:
+                return
+
+    (channel_id, access_hash, channel_username, dt_from, distance_from_core) = chan_to_query
+    if is_already_queried:
+        with connection.cursor() as cur:
+            cur.execute(f"DELETE FROM channels_to_requery WHERE id = {channel_id}")
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)
@@ -322,8 +341,7 @@ def handler(context, event):
     full_chat_d = collegram.channels.load(channel_id, paths, fs=fs)
     chat_d = collegram.channels.get_matching_chat_from_full(full_chat_d, channel_id)
     channel_username = chat_d.get("username")
-    # TODO: following "dt_from" should be set by orchestrator, taking into account `messages_last_queried_at`
-    dt_from = datetime.datetime.fromisoformat(data.get("dt_from", chat_d["date"]))
+    dt_from = datetime.datetime.fromisoformat(dt_from or chat_d["date"])
 
     input_chat = get_input_chan(
         client,
@@ -424,7 +442,7 @@ def handler(context, event):
                     fwd_id,
                     client,
                     connection,
-                    dist_from_core,
+                    distance_from_core,
                     producer,
                     lang_priorities,
                 )
@@ -436,9 +454,11 @@ def handler(context, event):
                     linked_un,
                     client,
                     connection,
-                    dist_from_core,
+                    distance_from_core,
                     producer,
                     lang_priorities,
                 )
 
-    # TODO: say we're done
+    # Send a message to call this querier again.
+    m = json.loads(json.dumps({"status": "chan_message_collection_done"}))
+    producer.send("chans_to_message", m)

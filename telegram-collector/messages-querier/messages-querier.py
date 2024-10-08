@@ -329,9 +329,6 @@ def handler(context, event):
                 return
 
     (channel_id, access_hash, channel_username, dt_from, distance_from_core) = chan_to_query
-    if is_already_queried:
-        with connection.cursor() as cur:
-            cur.execute(f"DELETE FROM channels_to_requery WHERE id = {channel_id}")
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)
@@ -458,6 +455,10 @@ def handler(context, event):
                     producer,
                     lang_priorities,
                 )
+
+    if is_already_queried:
+        with connection.cursor() as cur:
+            cur.execute(f"DELETE FROM channels_to_requery WHERE id = {channel_id}")
 
     # Send a message to call this querier again.
     m = json.loads(json.dumps({"status": "chan_message_collection_done"}))

@@ -10,6 +10,7 @@ import fsspec
 import nest_asyncio
 import polars as pl
 import psycopg
+import psycopg.rows
 from kafka import KafkaProducer
 from telethon import TelegramClient
 from telethon.errors import (
@@ -83,9 +84,57 @@ def get_input_chan(
         return
 
 
-def handle_new_linked_chan(
-    linked_username, client, connection, pred_dist_from_core, producer, lang_priorities
+def get_new_link_stats(prev_stats, update_stats):
+    if prev_stats is None:
+        new_stats = update_stats
+    else:
+        new_stats = {
+            "nr_messages": prev_stats.get("nr_messages", 0)
+            + update_stats["nr_messages"],
+            "first_message_date": prev_stats.get(
+                "first_message_date", update_stats["first_message_date"]
+            ),
+            "last_message_date": update_stats["last_message_date"],
+        }
+    return new_stats
+
+
+def handle_linked_chan(
+    channel_id,
+    linked_username,
+    link_stats,
+    client,
+    connection,
+    pred_dist_from_core,
+    producer,
+    lang_priorities,
 ):
+    with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        cur.execute(
+            "SELECT nr_messages, first_message_date, last_message_date"
+            "FROM telegram_message_url_links"
+            f"WHERE linking_channel_id = {channel_id} AND linked_channel_username = {linked_username}"
+        )
+        prev_stats = cur.fetchone()
+
+    new_stats = get_new_link_stats(prev_stats, link_stats)
+    links_table_update_d = {
+        "linking_channel_id": channel_id,
+        "linked_channel_username": linked_username,
+        **new_stats,
+    }
+    if prev_stats is None:
+        collegram.utils.insert_into_postgres(
+            connection, "telegram_message_url_links", links_table_update_d
+        )
+    else:
+        collegram.utils.update_postgres(
+            connection,
+            "telegram_message_url_links",
+            links_table_update_d,
+            ["linking_channel_id", "linked_channel_username"],
+        )
+
     base_query = (
         "SELECT"
         " id,"
@@ -132,8 +181,6 @@ def handle_new_linked_chan(
             producer.send("chans_to_query", value=insert_d)
 
     if exists:
-        # TODO: handle case in which previous message collection already found this
-        # channel
         (
             channel_id,
             created_at,
@@ -147,9 +194,10 @@ def handle_new_linked_chan(
             distance_from_core,
         ) = prio_info
         new_dist_from_core = min(pred_dist_from_core + 1, distance_from_core)
+        new_nr_linking_channels = nr_linking_channels + int(prev_stats is None)
         update_d = {
             "id": channel_id,
-            "nr_linking_channels": nr_linking_channels + 1,
+            "nr_linking_channels": new_nr_linking_channels,
             "distance_from_core": new_dist_from_core,
         }
 
@@ -165,7 +213,7 @@ def handle_new_linked_chan(
                 new_dist_from_core,
                 nr_forwarding_channels,
                 nr_recommending_channels,
-                nr_linking_channels + 1,
+                new_nr_linking_channels,
                 lang_priorities,
                 acty_slope=5,
             )
@@ -174,9 +222,42 @@ def handle_new_linked_chan(
         collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
 
-def handle_new_forward(
-    fwd_id, client, connection, pred_dist_from_core, producer, lang_priorities
+def handle_forward(
+    channel_id,
+    fwd_id,
+    fwd_stats,
+    client,
+    connection,
+    pred_dist_from_core,
+    producer,
+    lang_priorities,
 ):
+    with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        cur.execute(
+            "SELECT nr_messages, first_message_date, last_message_date"
+            "FROM telegram_message_forward_links"
+            f"WHERE linking_channel_id = {channel_id} AND linked_channel_id = {fwd_id}"
+        )
+        prev_stats = cur.fetchone()
+
+    new_stats = get_new_link_stats(prev_stats, fwd_stats)
+    fwds_table_update_d = {
+        "linking_channel_id": channel_id,
+        "linked_channel_id": fwd_id,
+        **new_stats,
+    }
+    if prev_stats is None:
+        collegram.utils.insert_into_postgres(
+            connection, "telegram_message_forward_links", fwds_table_update_d
+        )
+    else:
+        collegram.utils.update_postgres(
+            connection,
+            "telegram_message_forward_links",
+            fwds_table_update_d,
+            ["linking_channel_id", "linked_channel_id"],
+        )
+
     with connection.cursor() as cur:
         cur.execute(
             "SELECT"
@@ -210,8 +291,6 @@ def handle_new_forward(
         producer.send("chans_to_query", value=insert_d)
 
     else:
-        # TODO: handle case in which previous message collection already found this
-        # channel
         (
             created_at,
             channel_last_queried_at,
@@ -224,9 +303,10 @@ def handle_new_forward(
             distance_from_core,
         ) = prio_info
         new_dist_from_core = min(pred_dist_from_core + 1, distance_from_core)
+        new_nr_forwarding_channels = nr_forwarding_channels + int(prev_stats is None)
         update_d = {
             "id": fwd_id,
-            "nr_forwarding_channels": nr_forwarding_channels + 1,
+            "nr_forwarding_channels": new_nr_forwarding_channels,
             "distance_from_core": new_dist_from_core,
         }
 
@@ -240,7 +320,7 @@ def handle_new_forward(
                 participants_count,
                 lifespan_seconds,
                 new_dist_from_core,
-                nr_forwarding_channels + 1,
+                new_nr_forwarding_channels,
                 nr_recommending_channels,
                 nr_linking_channels,
                 lang_priorities,
@@ -256,8 +336,8 @@ async def collect_messages(
     channel,
     dt_from: datetime.datetime,
     dt_to: datetime.datetime,
-    forwards_set: set[int],
-    linked_chans: set[str],
+    forwards_stats: dict[int, dict],
+    linked_chans_stats: dict[str, dict],
     anon_func,
     messages_save_path: Path,
     media_save_path: Path,
@@ -272,8 +352,8 @@ async def collect_messages(
             channel,
             dt_from,
             dt_to,
-            forwards_set,
-            linked_chans,
+            forwards_stats,
+            linked_chans_stats,
             anon_func,
             media_save_path,
             offset_id=offset_id,
@@ -369,15 +449,15 @@ def handler(context, event):
         dt_from, global_dt_to, interval="1mo", eager=True, time_zone="UTC"
     )
 
-    forwarded_chans = set()
-    linked_chans = {channel_username} if channel_username is not None else set()
+    forwarded_chans_stats = {}
+    linked_chans_stats = {}
 
     # Caution: the sorting only works because of file name format!
     existing_files = sorted(list(fs.glob(f"{chan_paths.messages}/*.jsonl")))
 
     for dt_from, dt_to in zip(dt_bin_edges[:-1], dt_bin_edges[1:]):
-        chunk_fwds = set()
-        chunk_linked_chans = set()
+        chunk_fwds_stats = {}
+        chunk_linked_chans_stats = {}
         dt_from_in_path = dt_from.replace(
             day=1, hour=0, minute=0, second=0, microsecond=0
         ).date()
@@ -417,8 +497,8 @@ def handler(context, event):
                     input_chat,
                     dt_from,
                     dt_to,
-                    chunk_fwds,
-                    chunk_linked_chans,
+                    chunk_fwds_stats,
+                    chunk_linked_chans_stats,
                     anonymiser.anonymise,
                     messages_save_path,
                     media_save_path,
@@ -434,29 +514,35 @@ def handler(context, event):
             m["table"] = "telegram-queries"
             producer.send("telegram_collected_metadata", value=m)
 
-            new_fwds = chunk_fwds.difference(forwarded_chans)
-            for fwd_id in new_fwds:
-                forwarded_chans.add(fwd_id)
-                handle_new_forward(
+            for fwd_id, fwd_stats in chunk_fwds_stats.items():
+                prev_stats = forwarded_chans_stats.get(fwd_id)
+                end_chunk_stats = get_new_link_stats(prev_stats, fwd_stats)
+                handle_forward(
+                    channel_id,
                     fwd_id,
+                    end_chunk_stats,
                     client,
                     connection,
                     distance_from_core,
                     producer,
                     lang_priorities,
                 )
+                forwarded_chans_stats[fwd_id] = end_chunk_stats
 
-            new_linked_chans = chunk_linked_chans.difference(linked_chans)
-            for linked_un in new_linked_chans:
-                linked_chans.add(linked_un)
-                handle_new_linked_chan(
-                    linked_un,
+            for link_un, link_stats in chunk_linked_chans_stats.items():
+                prev_stats = linked_chans_stats.get(link_un)
+                end_chunk_stats = get_new_link_stats(prev_stats, link_stats)
+                handle_linked_chan(
+                    channel_id,
+                    link_un,
+                    end_chunk_stats,
                     client,
                     connection,
                     distance_from_core,
                     producer,
                     lang_priorities,
                 )
+                linked_chans_stats[link_un] = end_chunk_stats
 
     if is_already_queried:
         with connection.cursor() as cur:

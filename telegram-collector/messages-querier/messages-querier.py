@@ -316,19 +316,21 @@ def handler(context, event):
     )
     with connection.cursor() as cur:
         # First look for already-queried channel for which we need new messages
-        cur.execute(query_fmt.format(table='channel_to_requery'))
+        cur.execute(query_fmt.format(table="channel_to_requery"))
         chan_to_query = cur.fetchone()
 
         is_already_queried = chan_to_query is not None
 
         if not is_already_queried:
             # If there is none, query a new one.
-            cur.execute(query_fmt.format(table='channels_to_query'))
+            cur.execute(query_fmt.format(table="channels_to_query"))
             chan_to_query = cur.fetchone()
             if chan_to_query is None:
                 return
 
-    (channel_id, access_hash, channel_username, dt_from, distance_from_core) = chan_to_query
+    (channel_id, access_hash, channel_username, dt_from, distance_from_core) = (
+        chan_to_query
+    )
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)

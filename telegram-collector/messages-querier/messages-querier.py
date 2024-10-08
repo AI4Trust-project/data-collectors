@@ -112,8 +112,9 @@ def handle_linked_chan(
     with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(
             "SELECT nr_messages, first_message_date, last_message_date"
-            "FROM telegram_message_url_links"
-            f"WHERE linking_channel_id = {channel_id} AND linked_channel_username = {linked_username}"
+            " FROM telegram_message_url_links"
+            f" WHERE linking_channel_id = {channel_id}"
+            f" AND linked_channel_username = '{linked_username}'"
         )
         prev_stats = cur.fetchone()
 
@@ -235,8 +236,8 @@ def handle_forward(
     with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(
             "SELECT nr_messages, first_message_date, last_message_date"
-            "FROM telegram_message_forward_links"
-            f"WHERE linking_channel_id = {channel_id} AND linked_channel_id = {fwd_id}"
+            " FROM telegram_message_forward_links"
+            f" WHERE linking_channel_id = {channel_id} AND linked_channel_id = {fwd_id}"
         )
         prev_stats = cur.fetchone()
 

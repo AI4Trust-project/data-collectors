@@ -397,7 +397,7 @@ def handler(context, event):
     )
     with connection.cursor() as cur:
         # First look for already-queried channel for which we need new messages
-        cur.execute(query_fmt.format(table="channel_to_requery"))
+        cur.execute(query_fmt.format(table="channels_to_requery"))
         chan_to_query = cur.fetchone()
 
         is_already_queried = chan_to_query is not None

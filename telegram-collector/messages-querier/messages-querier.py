@@ -421,7 +421,9 @@ def handler(context, event):
     full_chat_d = collegram.channels.load(channel_id, paths, fs=fs)
     chat_d = collegram.channels.get_matching_chat_from_full(full_chat_d, channel_id)
     channel_username = chat_d.get("username")
-    dt_from = datetime.datetime.fromisoformat(dt_from or chat_d["date"])
+    dt_from = dt_from or chat_d["date"]
+    if isinstance(dt_from, str):
+        dt_from = datetime.datetime.fromisoformat(dt_from)
 
     input_chat = get_input_chan(
         client,

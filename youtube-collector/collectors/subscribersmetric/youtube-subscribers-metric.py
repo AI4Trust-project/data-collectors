@@ -16,7 +16,6 @@ def init_context(context):
         os.environ.get("MINIO_HOME"),
         access_key=os.environ.get("MINIO_ACCESS_KEY"),
         secret_key=os.environ.get("MINIO_SECRET_KEY"),
-        secure=False,
     )
 
     producer = KafkaProducer(

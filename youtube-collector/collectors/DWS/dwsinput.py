@@ -1,14 +1,11 @@
 import json
 import os
 import time
-import uuid
 from datetime import datetime, timedelta, timezone
 
-import psycopg2
 from googleapiclient.discovery import build
-from minio import Minio
-
 from kafka import KafkaProducer
+from minio import Minio
 
 
 def init_context(context):
@@ -26,20 +23,9 @@ def init_context(context):
     api_key = os.environ.get("YOUTUBE_API_KEY")
     youtube = build("youtube", "v3", developerKey=api_key)
 
-    dbname = os.environ.get("DATABASE_NAME")
-    user = os.environ.get("DATABASE_USER")
-    password = os.environ.get("DATABASE_PWD")
-    host = os.environ.get("DATABASE_HOST")
-    port = os.environ.get("DATABASE_PORT")
-
-    conn = psycopg2.connect(
-        dbname=dbname, user=user, password=password, host=host, port=port
-    )
-
     setattr(context, "producer", producer)
     setattr(context, "client", client)
     setattr(context, "youtube", youtube)
-    setattr(context, "conn", conn)
 
 
 def wait_until_midnight():
@@ -172,5 +158,5 @@ def handler(context, event):
     m = json.loads(json.dumps(message))
     # send data to iceberg
     context.producer.send("collected_metadata", value=m)
-    # send data to be dws
+    # send data to dws
     context.producer.send("youtube-dws", value=m)

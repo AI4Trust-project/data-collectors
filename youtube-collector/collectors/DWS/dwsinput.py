@@ -141,7 +141,6 @@ def get_normalized_subscriber_count(video_id, context):
     return normalized_value
 
 
-
 def handler(context, event):
 
     data = json.loads(event.body.decode("utf-8"))
@@ -152,7 +151,6 @@ def handler(context, event):
     normalized_value = get_normalized_subscriber_count(video_id, context)
 
     date = datetime.now().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
 
     message = {
         "collectionId": data["collectionId"],
@@ -167,7 +165,7 @@ def handler(context, event):
         "description": data.get("description", ""),
         "title": data.get("title", ""),
         "thumbnail": "https://img.youtube.com/vi/{}/default.jpg".format(video_id),
-        "normalisedSubscribers": float(normalized_value)
+        "normalisedSubscribers": float(normalized_value),
     }
 
     message["table"] = "youtube-video-dws"

@@ -273,6 +273,7 @@ def handler(context, event):
 
             m = json.loads(json.dumps(row))
             context.producer.send("collected_metadata", value=m)
+            context.producer.send("youtubedws", value=m)
 
         except Exception as e:
             print("Error Snippet Table: {}".format(e))

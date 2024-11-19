@@ -1,0 +1,1 @@
+pip install git+https://github.com/TLouf/collegram.git@nuclio s3fs kafka-python psycopg[binary] nest_asyncio lingua-language-detector

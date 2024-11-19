@@ -1,0 +1,1 @@
+pip install psycopg[binary] git+https://github.com/TLouf/collegram.git@nuclio

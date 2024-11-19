@@ -1,3 +1,4 @@
+import base64
 import datetime
 import json
 import os
@@ -59,6 +60,18 @@ async def init_context(context):
         value_serializer=lambda x: json.dumps(x, default=_json_default).encode("utf-8"),
     )
     setattr(context, "producer", producer)
+
+def _iceberg_json_default(value):
+    if isinstance(value, bytes):
+        return base64.b64encode(value).decode("ascii")
+    elif isinstance(value, datetime):
+        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    else:
+        return repr(value)
+
+
+def iceberg_json_dumps(d: dict):
+    return json.dumps(d, default=_iceberg_json_default).encode("utf-8")
 
 
 def handle_recommended(
@@ -287,7 +300,7 @@ def handler(context, event):
         flat_channel_d["table"] = "telegram-channel-metadata"
         flat_channel_d["query_id"] = query_info["query_id"]
         # send channel metadata to iceberg
-        producer.send("telegram_collected_channels", value=flat_channel_d)
+        producer.send("telegram_collected_channels", value=iceberg_json_dumps(flat_channel_d))
 
         # Save metadata about the query itself
         query_info["channel_id"] = chat.id

@@ -15,3 +15,7 @@ This repository contains a set of components to collect data from social media.
 ## News Collection
 
 ![alt text](/imgs/news_diagram.png "Diagram of the News Collection")
+
+## Telegram collection
+
+![](/imgs/telegram_diagram.svg)

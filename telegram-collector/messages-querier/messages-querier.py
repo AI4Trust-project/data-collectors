@@ -67,7 +67,7 @@ async def init_context(context):
 def _iceberg_json_default(value):
     if isinstance(value, bytes):
         return base64.b64encode(value).decode("ascii")
-    elif isinstance(value, datetime):
+    elif isinstance(value, datetime.datetime):
         return value.strftime("%Y-%m-%dT%H:%M:%SZ")
     else:
         return repr(value)

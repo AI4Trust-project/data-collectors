@@ -438,6 +438,7 @@ def handler(context, event):
     dt_from = dt_from or chat_d["date"]
     if isinstance(dt_from, str):
         dt_from = datetime.datetime.fromisoformat(dt_from)
+    dt_from = dt_from.astimezone(datetime.timezone.utc)
 
     input_chat = get_input_chan(
         client,

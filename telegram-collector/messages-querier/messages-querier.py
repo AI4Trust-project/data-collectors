@@ -426,6 +426,7 @@ def handler(context, event):
     (channel_id, access_hash, channel_username, dt_from, distance_from_core) = (
         chan_to_query
     )
+    context.logger.info(f'collecting messages from channel {channel_id}')
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)

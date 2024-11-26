@@ -12,7 +12,6 @@ import psycopg
 from kafka import KafkaProducer
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telethon.tl.tlobject import _json_default
 
 
 async def init_context(context):
@@ -54,6 +53,18 @@ async def init_context(context):
         value_serializer=lambda x: json.dumps(x, default=_json_default).encode("utf-8"),
     )
     setattr(context, "producer", producer)
+
+def _json_default(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    else:
+        return repr(value)
+
+def _iceberg_json_default(value):
+    if isinstance(value, datetime.datetime):
+        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    else:
+        return repr(value)
 
 
 def insert_into_postgres(conn, values: list):

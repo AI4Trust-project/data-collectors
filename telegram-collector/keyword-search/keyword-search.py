@@ -54,11 +54,13 @@ async def init_context(context):
     )
     setattr(context, "producer", producer)
 
+
 def _json_default(value):
     if isinstance(value, datetime):
         return value.isoformat()
     else:
         return repr(value)
+
 
 def _iceberg_json_default(value):
     if isinstance(value, datetime.datetime):
@@ -139,18 +141,18 @@ def handler(context, event):
     client = context.client
     connection = context.connection
 
+    context.logger.info("# Started keyword search")
     kw_dir_path = Path("/telegram") / "keywords"
     for kw_fpath in fs.ls(str(kw_dir_path)):
         language_code = Path(kw_fpath).stem
+        context.logger.info(f"## Started with keywords in {language_code}")
         with fs.open(str(kw_fpath), "r", encoding="utf-8") as f:
             keywords = [line for line in f]
             for kw in keywords:
+                context.logger.info(f"### Started with keyword {kw}")
                 try:
                     data = []
-                    date = (
-                        datetime.datetime.now()
-                        .astimezone(timezone.utc)
-                    )
+                    date = datetime.datetime.now().astimezone(timezone.utc)
                     query_uuid = str(uuid.uuid4())
                     api_chans = collegram.channels.search_from_api(client, kw)
                     channels = api_chans
@@ -181,5 +183,6 @@ def handler(context, event):
                     print(e)
                     continue
 
+    context.logger.info("# Ended keyword search")
     m = json.loads(json.dumps({"status": "init_done"}))
     producer.send("telegram-keywords", value=m)

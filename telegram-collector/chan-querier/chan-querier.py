@@ -60,11 +60,13 @@ async def init_context(context):
     )
     setattr(context, "producer", producer)
 
+
 def _json_default(value):
     if isinstance(value, datetime):
         return value.isoformat()
     else:
         return repr(value)
+
 
 def _iceberg_json_default(value):
     if isinstance(value, datetime.datetime):
@@ -192,9 +194,12 @@ def handler(context, event):
         # TODO What then?
         # For all but ChannelPrivateError, can try with another key (TODO: add to
         # list of new channels?).
-        # logger.warning(f"could not get data for listed channel {channel_id}")
+        context.logger.warning(
+            f"Could not get channel metadata from channel {channel_id}"
+        )
         raise e
 
+    context.logger.info(f"# Collecting channel metadata from channel {channel_id}")
     update_d = {"id": channel_id, "channel_last_queried_at": query_time}
     collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
 
@@ -223,6 +228,7 @@ def handler(context, event):
         c for c in channel_full.chats if c.id != channel_id
     ]
     for i, chat in enumerate(chats):
+        context.logger.info(f"## Collecting chat metadata for chat {channel_id}")
         if i > 0:
             query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
             channel_full = collegram.channels.get_full(
@@ -303,7 +309,9 @@ def handler(context, event):
         flat_channel_d["table"] = "telegram-channel-metadata"
         flat_channel_d["query_id"] = query_info["query_id"]
         # send channel metadata to iceberg
-        producer.send("telegram_collected_channels", value=iceberg_json_dumps(flat_channel_d))
+        producer.send(
+            "telegram_collected_channels", value=iceberg_json_dumps(flat_channel_d)
+        )
 
         # Save metadata about the query itself
         query_info["channel_id"] = chat.id

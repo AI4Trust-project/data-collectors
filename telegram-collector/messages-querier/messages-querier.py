@@ -62,11 +62,13 @@ async def init_context(context):
     )
     setattr(context, "producer", producer)
 
+
 def _json_default(value):
     if isinstance(value, datetime):
         return value.isoformat()
     else:
         return repr(value)
+
 
 def _iceberg_json_default(value):
     if isinstance(value, datetime.datetime):
@@ -388,7 +390,9 @@ async def collect_messages(
                 m_dict["channel_id"] = channel.channel_id
                 m_dict["query_id"] = query_id
                 # send message to iceberg
-                producer.send("telegram_collected_messages", value=iceberg_json_dumps(m_dict))
+                producer.send(
+                    "telegram_collected_messages", value=iceberg_json_dumps(m_dict)
+                )
 
 
 def handler(context, event):
@@ -428,7 +432,6 @@ def handler(context, event):
     (channel_id, access_hash, channel_username, dt_from, distance_from_core) = (
         chan_to_query
     )
-    context.logger.info(f'collecting messages from channel {channel_id}')
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)
@@ -448,6 +451,9 @@ def handler(context, event):
         channel_username=channel_username,
         channel_id=channel_id,
         access_hash=access_hash,
+    )
+    context.logger.info(
+        f"# Collecting messages from {channel_username} username, with ID {channel_id}"
     )
 
     def insert_anon_pair(original, anonymised):
@@ -512,6 +518,7 @@ def handler(context, event):
                 "result_path": str(messages_save_path.absolute()),
             }
 
+            context.logger.info(f"## Collecting messages from {dt_from} to {dt_to}")
             client.loop.run_until_complete(
                 collect_messages(
                     client,

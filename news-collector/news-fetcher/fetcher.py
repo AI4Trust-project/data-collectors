@@ -58,18 +58,13 @@ def handler(context, event):
         else:
             search_parameters["n_results"] = 0
 
-        search_parameters["table"] = "news-search"
-
-        # insert search in iceberg
-        producer.send("collected_news", value=json.loads(json.dumps(search_parameters)))
 
         for _, row in fetched_articles.iterrows():
             try:
                 article_message = row.to_dict()
                 article_message["search_date"] = datetime.now().strftime("%Y-%m-%d")
 
-                # add adcional info
-                article_message["table"] = "news-fetched"
+                # add additional info
                 article_message["data_owner"] = search_parameters.get(
                     "data_owner", "FBK-NEWS"
                 )
@@ -80,18 +75,15 @@ def handler(context, event):
                     .strftime("%Y-%m-%dT%H:%M:%SZ"),
                 )
                 article_message["search_id"] = search_parameters.get(
-                    "search_id", "None"
+                    "id", "None"
                 )
                 article_message["keyword_id"] = search_parameters.get("keyword_id", "None")
                 article_message["keyword"] = search_parameters.get("keyword", "None")
-                article_message["fetched_id"] = str(uuid.uuid4())
+                article_message["id"] = str(uuid.uuid4())
 
                 article_json = json.loads(json.dumps(article_message))
 
-                producer.send("fetched_articles", value=article_json)
-
-                # save in iceberg
-                producer.send("collected_news", value=article_json)
+                producer.send("news.fetched_articles", value=article_json)
             except Exception as e:
                 print(e)
                 continue

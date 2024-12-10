@@ -17,10 +17,9 @@ def init_context(context):
     user = os.environ.get("DATABASE_USER")
     password = os.environ.get("DATABASE_PWD")
     host = os.environ.get("DATABASE_HOST")
-    port = os.environ.get("DATABASE_PORT")
 
     conn = psycopg2.connect(
-        dbname=dbname, user=user, password=password, host=host, port=port
+        dbname=dbname, user=user, password=password, host=host
     )
 
     setattr(context, "producer", producer)
@@ -36,7 +35,7 @@ def get_keywords(conn):
 
         cur = conn.cursor()
 
-        query = "SELECT keyword_id, keyword, num_records, country, data_owner, domain, domain_exact, theme, near, repeat_ FROM search_keywords_news"
+        query = "SELECT keyword_id, keyword, num_records, country, data_owner, domain, domain_exact, theme, near, repeat_ FROM news.search_keywords"
 
         cur.execute(query)
 
@@ -109,7 +108,7 @@ def handler(context, event):
             "created_at": datetime.now()
             .astimezone(timezone.utc)
             .strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "search_id": str(uuid.uuid4()),
+            "id": str(uuid.uuid4()),
             "keyword_id": keyword_id,
             "keyword": keyword,
             "num_records": num_records,
@@ -123,4 +122,4 @@ def handler(context, event):
             "repeat": repeat,
         }
 
-        producer.send("search_parameters", value=json.loads(json.dumps(message)))
+        producer.send("news.search_parameters", value=json.loads(json.dumps(message)))

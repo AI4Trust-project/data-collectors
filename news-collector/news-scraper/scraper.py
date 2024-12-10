@@ -3,6 +3,7 @@ import json
 import os
 from datetime import datetime, timezone
 from io import BytesIO
+import uuid
 
 import nltk
 import requests
@@ -20,7 +21,7 @@ def init_context(context):
 
     setattr(context, "producer", producer)
 
-    nltk.download("punkt_tab")
+    # nltk.download("punkt_tab")
 
 
 def hash_image(image_url):
@@ -49,7 +50,7 @@ def newspaper3k_scraper(url):
     try:
         article.download()
         article.parse()
-        article.nlp()
+        # article.nlp()
         return {
             "title": article.title,
             "authors": article.authors,
@@ -79,16 +80,16 @@ def handler(context, event):
 
     approved_article = json.loads(event.body.decode("utf-8"))
 
-    scraped_article = scrape_article(approved_article)
+    scraped_article = approved_article | scrape_article(approved_article)
 
     if scraped_article:
 
         img_hash = hash_image(scraped_article["image_url"])
         scraped_article["image_hash"] = "md5:" + str(img_hash)
 
-        # add adcional info
-        scraped_article["table"] = "news-scraped"
-        scraped_article["fetched_id"] = approved_article.get("fetched_id", "None")
+        # add additional info
+        scraped_article["id"] = str(uuid.uuid4())
+        scraped_article["fetched_id"] = approved_article.get("id", "None")
         scraped_article["data_owner"] = approved_article.get("data_owner", "FBK-NEWS")
         scraped_article["created_at"] = approved_article.get(
             "created_at",
@@ -98,4 +99,4 @@ def handler(context, event):
         scraped_article["keyword_id"] = approved_article.get("keyword_id", "None")
         scraped_article["keyword"] = approved_article.get("keyword", "None")
 
-        producer.send("collected_news", value=json.loads(json.dumps(scraped_article)))
+        producer.send("news.collected_news", value=json.loads(json.dumps(scraped_article)))

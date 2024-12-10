@@ -46,4 +46,4 @@ def handler(context, event):
 
     if check_article(fetched_article):
 
-        producer.send("approved_articles", value=json.loads(json.dumps(fetched_article)))
+        producer.send("news.approved_articles", value=json.loads(json.dumps(fetched_article)))

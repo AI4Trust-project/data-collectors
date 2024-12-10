@@ -1,4 +1,5 @@
-CREATE TABLE search_keywords_news(
+CREATE SCHEMA news;
+CREATE TABLE news.search_keywords(
     keyword_id VARCHAR(255),
     keyword VARCHAR(255),
     num_records INT,
@@ -10,3 +11,6 @@ CREATE TABLE search_keywords_news(
     near VARCHAR(255),
     repeat_ VARCHAR(255)
 );
+
+-- example keyword
+-- insert into news.search_keywords values(1,'climate change',250,'uk','FBK',null,null,null,null,null)

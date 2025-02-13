@@ -371,6 +371,7 @@ async def collect_messages(
     query_id,
     offset_id=0,
 ):
+    last_id = offset_id
     with fs.open(messages_save_path, "a") as f:
         async for m in collegram.messages.yield_channel_messages(
             client,
@@ -399,6 +400,8 @@ async def collect_messages(
                 producer.send(
                     "telegram_collected_messages", value=iceberg_json_dumps(m_dict)
                 )
+            last_id = m.id
+    return last_id
 
 
 def handler(context, event):
@@ -416,7 +419,7 @@ def handler(context, event):
     connection = context.connection
 
     only_top_priority = "ORDER BY collection_priority ASC LIMIT 1"
-    cols = "id, access_hash, username, messages_last_queried_at, distance_from_core"
+    cols = "id, access_hash, username, messages_last_queried_at, last_queried_message_id, distance_from_core"
     with connection.cursor() as cur:
         # First look for already-queried channel for which we need new messages
         cur.execute(f"SELECT id FROM telegram.channels_to_requery {only_top_priority}")
@@ -450,7 +453,7 @@ def handler(context, event):
     if chan_to_query is None:
         return
 
-    (channel_id, access_hash, channel_username, dt_from, distance_from_core) = (
+    (channel_id, access_hash, channel_username, dt_from, last_queried_message_id, distance_from_core) = (
         chan_to_query
     )
 
@@ -519,18 +522,7 @@ def handler(context, event):
         )
 
         if not fs.exists(messages_save_path) or is_last_saved_period:
-            offset_id = 0
-            if is_last_saved_period:
-                # Get the offset in case collection was unexpectedly interrupted
-                # while writing for this time range.
-                # TODO: remove, replace with postgres query
-                last_message_saved = collegram.utils.read_nth_to_last_line(
-                    messages_save_path,
-                    fs=fs,
-                )
-                # Check if not empty file before reading message
-                if last_message_saved:
-                    offset_id = collegram.json.read_message(last_message_saved).id
+            offset_id = 0 if last_queried_message_id is None else last_queried_message_id
 
             query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
             query_info = {
@@ -543,7 +535,7 @@ def handler(context, event):
             }
 
             context.logger.info(f"## Collecting messages from {dt_from} to {dt_to}")
-            client.loop.run_until_complete(
+            new_offset_id = client.loop.run_until_complete(
                 collect_messages(
                     client,
                     input_chat,
@@ -561,8 +553,7 @@ def handler(context, event):
                 )
             )
 
-            # TODO: write to postgres last_message_id
-            update_d = {"id": channel_id, "last_queried_message_id": query_time}
+            update_d = {"id": channel_id, "last_queried_message_id": new_offset_id}
             collegram.utils.update_postgres(
                 connection, "telegram.channels_to_query", update_d, "id"
             )

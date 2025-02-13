@@ -130,7 +130,7 @@ def handle_linked_chan(
     with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(
             "SELECT nr_messages, first_message_date, last_message_date"
-            " FROM telegram_message_url_links"
+            " FROM telegram.message_url_links"
             f" WHERE linking_channel_id = {channel_id}"
             f" AND linked_channel_username = '{linked_username}'"
         )
@@ -144,12 +144,12 @@ def handle_linked_chan(
     }
     if prev_stats is None:
         collegram.utils.insert_into_postgres(
-            connection, "telegram_message_url_links", links_table_update_d
+            connection, "telegram.message_url_links", links_table_update_d
         )
     else:
         collegram.utils.update_postgres(
             connection,
-            "telegram_message_url_links",
+            "telegram.message_url_links",
             links_table_update_d,
             ["linking_channel_id", "linked_channel_username"],
         )
@@ -195,7 +195,7 @@ def handle_linked_chan(
                 "distance_from_core": pred_dist_from_core + 1,
             }
             collegram.utils.insert_into_postgres(
-                connection, "channels_to_query", insert_d
+                connection, "telegram.channels_to_query", insert_d
             )
             producer.send("chans_to_query", value=insert_d)
 
@@ -238,7 +238,7 @@ def handle_linked_chan(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
 
 
 def handle_forward(
@@ -254,7 +254,7 @@ def handle_forward(
     with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(
             "SELECT nr_messages, first_message_date, last_message_date"
-            " FROM telegram_message_forward_links"
+            " FROM telegram.message_forward_links"
             f" WHERE linking_channel_id = {channel_id} AND linked_channel_id = {fwd_id}"
         )
         prev_stats = cur.fetchone()
@@ -267,12 +267,12 @@ def handle_forward(
     }
     if prev_stats is None:
         collegram.utils.insert_into_postgres(
-            connection, "telegram_message_forward_links", fwds_table_update_d
+            connection, "telegram.message_forward_links", fwds_table_update_d
         )
     else:
         collegram.utils.update_postgres(
             connection,
-            "telegram_message_forward_links",
+            "telegram.message_forward_links",
             fwds_table_update_d,
             ["linking_channel_id", "linked_channel_id"],
         )
@@ -306,7 +306,7 @@ def handle_forward(
             "nr_forwarding_channels": 1,
             "distance_from_core": pred_dist_from_core + 1,
         }
-        collegram.utils.insert_into_postgres(connection, "channels_to_query", insert_d)
+        collegram.utils.insert_into_postgres(connection, "telegram.channels_to_query", insert_d)
         producer.send("chans_to_query", value=insert_d)
 
     else:
@@ -347,7 +347,7 @@ def handle_forward(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
 
 
 async def collect_messages(
@@ -417,7 +417,7 @@ def handler(context, event):
     )
     with connection.cursor() as cur:
         # First look for already-queried channel for which we need new messages
-        cur.execute(query_fmt.format(table="channels_to_requery"))
+        cur.execute(query_fmt.format(table="telegram.channels_to_requery"))
         chan_to_query = cur.fetchone()
 
         is_already_queried = chan_to_query is not None
@@ -431,7 +431,7 @@ def handler(context, event):
 
         else:
             # If there is none, query a new one.
-            cur.execute(query_fmt.format(table="channels_to_query"))
+            cur.execute(query_fmt.format(table="telegram.channels_to_query"))
             chan_to_query = cur.fetchone()
             if chan_to_query is None:
                 return
@@ -466,7 +466,7 @@ def handler(context, event):
     def insert_anon_pair(original, anonymised):
         insert_d = {"original": original, "anonymised": anonymised}
         collegram.utils.insert_into_postgres(
-            connection, table="anonymisation_map", values=insert_d
+            connection, table="telegram.anonymisation_map", values=insert_d
         )
 
     anonymiser = collegram.utils.HMAC_anonymiser(save_func=insert_anon_pair)
@@ -477,7 +477,7 @@ def handler(context, event):
     )
     query_time = global_dt_to
     update_d = {"id": channel_id, "messages_last_queried_at": query_time}
-    collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+    collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
 
     dt_bin_edges = pl.datetime_range(
         dt_from, global_dt_to, interval="1mo", eager=True, time_zone="UTC"

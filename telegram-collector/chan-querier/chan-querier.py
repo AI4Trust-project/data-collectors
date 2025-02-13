@@ -107,7 +107,7 @@ def handle_recommended(
             "nr_recommending_channels": 1,
             "distance_from_core": pred_dist_from_core + 1,
         }
-        collegram.utils.insert_into_postgres(connection, "channels_to_query", insert_d)
+        collegram.utils.insert_into_postgres(connection, "telegram.channels_to_query", insert_d)
         producer.send("chans_to_query", value=insert_d)
 
     else:
@@ -147,7 +147,7 @@ def handle_recommended(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
 
 
 def handler(context, event):
@@ -201,7 +201,7 @@ def handler(context, event):
 
     context.logger.info(f"# Collecting channel metadata from channel {channel_id}")
     update_d = {"id": channel_id, "channel_last_queried_at": query_time}
-    collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+    collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
 
     query_info = {
         "query_id": str(uuid.uuid4()),
@@ -215,7 +215,7 @@ def handler(context, event):
     def insert_anon_pair(original, anonymised):
         insert_d = {"original": original, "anonymised": anonymised}
         collegram.utils.insert_into_postgres(
-            connection, table="anonymisation_map", values=insert_d
+            connection, table="telegram.anonymisation_map", values=insert_d
         )
 
     anonymiser = collegram.utils.HMAC_anonymiser(save_func=insert_anon_pair)
@@ -239,7 +239,7 @@ def handler(context, event):
             query_info["query_id"] = str(uuid.uuid4())
             update_d = {"id": channel_id, "channel_last_queried_at": query_time}
             collegram.utils.update_postgres(
-                connection, "channels_to_query", update_d, "id"
+                connection, "telegram.channels_to_query", update_d, "id"
             )
 
         channel_full_d = json.loads(channel_full.to_json())
@@ -297,7 +297,7 @@ def handler(context, event):
             "nr_participants": chat.participants_count,
             "nr_messages": channel_full_d["message_count"],
         }
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
 
         channel_full_d = collegram.channels.anon_full_dict(
             channel_full_d,

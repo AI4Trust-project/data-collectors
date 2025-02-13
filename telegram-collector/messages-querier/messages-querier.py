@@ -238,7 +238,9 @@ def handle_linked_chan(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
 
 
 def handle_forward(
@@ -306,7 +308,9 @@ def handle_forward(
             "nr_forwarding_channels": 1,
             "distance_from_core": pred_dist_from_core + 1,
         }
-        collegram.utils.insert_into_postgres(connection, "telegram.channels_to_query", insert_d)
+        collegram.utils.insert_into_postgres(
+            connection, "telegram.channels_to_query", insert_d
+        )
         producer.send("chans_to_query", value=insert_d)
 
     else:
@@ -347,7 +351,9 @@ def handle_forward(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
 
 
 async def collect_messages(
@@ -477,7 +483,9 @@ def handler(context, event):
     )
     query_time = global_dt_to
     update_d = {"id": channel_id, "messages_last_queried_at": query_time}
-    collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
+    collegram.utils.update_postgres(
+        connection, "telegram.channels_to_query", update_d, "id"
+    )
 
     dt_bin_edges = pl.datetime_range(
         dt_from, global_dt_to, interval="1mo", eager=True, time_zone="UTC"
@@ -546,6 +554,10 @@ def handler(context, event):
             )
 
             # TODO: write to postgres last_message_id
+            update_d = {"id": channel_id, "last_queried_message_id": query_time}
+            collegram.utils.update_postgres(
+                connection, "telegram.channels_to_query", update_d, "id"
+            )
             # Save metadata about the query itself
             m = json.loads(json.dumps(query_info, default=_json_default))
             m["table"] = "telegram-queries"

@@ -422,7 +422,14 @@ def handler(context, event):
 
         is_already_queried = chan_to_query is not None
 
-        if not is_already_queried:
+        if is_already_queried:
+            (channel_id, access_hash, channel_username, dt_from, distance_from_core) = (
+                chan_to_query
+            )
+            with connection.cursor() as cur:
+                cur.execute(f"DELETE FROM channels_to_requery WHERE id = {channel_id}")
+
+        else:
             # If there is none, query a new one.
             cur.execute(query_fmt.format(table="channels_to_query"))
             chan_to_query = cur.fetchone()
@@ -571,10 +578,6 @@ def handler(context, event):
                     lang_priorities,
                 )
                 linked_chans_stats[link_un] = end_chunk_stats
-
-    if is_already_queried:
-        with connection.cursor() as cur:
-            cur.execute(f"DELETE FROM channels_to_requery WHERE id = {channel_id}")
 
     # Send a message to call this querier again.
     m = json.loads(json.dumps({"status": "chan_message_collection_done"}))

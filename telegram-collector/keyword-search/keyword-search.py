@@ -6,7 +6,6 @@ from datetime import timezone
 from pathlib import Path
 
 import collegram
-import fsspec
 import nest_asyncio
 import psycopg
 from kafka import KafkaProducer
@@ -15,17 +14,6 @@ from telethon.sessions import StringSession
 
 
 async def init_context(context):
-    access_key = os.environ["MINIO_ACCESS_KEY"]
-    secret = os.environ["MINIO_SECRET_KEY"]
-    minio_home = os.environ["MINIO_HOME"]
-    storage_options = {
-        "endpoint_url": f"https://{minio_home}",
-        "key": access_key,
-        "secret": secret,
-    }
-    fs = fsspec.filesystem("s3", **storage_options)
-    setattr(context, "fs", fs)
-
     # Connect to an existing database
     connection = psycopg.connect(
         user=os.environ["POSTGRES_USER"],
@@ -36,7 +24,6 @@ async def init_context(context):
     )
     setattr(context, "connection", connection)
 
-    # prefix = os.environ["TELEGRAM_OWNER"].upper()
     client = TelegramClient(
         StringSession(os.environ["AI4TRUST_TG_SESSION"]),
         os.environ["AI4TRUST_API_ID"],
@@ -74,7 +61,7 @@ def insert_into_postgres(conn, values: list):
     try:
         cur = conn.cursor()
         query = (
-            "INSERT INTO channels_to_query"
+            "INSERT INTO telegram.channels_to_query"
             "(id, access_hash, query_id, search_date, data_owner,"
             " search_keyword, language_code) VALUES "
             "(%s, %s, %s, %s, %s, %s, %s)"
@@ -136,52 +123,60 @@ def handler(context, event):
     # add nest asyncio for waiting calls
     nest_asyncio.apply()
 
-    fs = context.fs
     producer = context.producer
     client = context.client
     connection = context.connection
 
+    lang_d = {
+        "english": "EN",
+        "french": "FR",
+        "spanish": "ES",
+        "german": "DE",
+        "greek": "EL",
+        "italian": "IT",
+        "polish": "PL",
+        "romanian": "RO",
+    }
+    with connection.cursor() as cur:
+        cur.execute("SELECT keyword, lang, topic FROM telegram.search_keywords")
+        keywords_data = cur.fetchall()
+
     context.logger.info("# Started keyword search")
-    kw_dir_path = Path("/telegram") / "keywords"
-    for kw_fpath in fs.ls(str(kw_dir_path)):
-        language_code = Path(kw_fpath).stem
-        context.logger.info(f"## Started with keywords in {language_code}")
-        with fs.open(str(kw_fpath), "r", encoding="utf-8") as f:
-            keywords = [line for line in f]
-            for kw in keywords:
-                context.logger.info(f"### Started with keyword {kw}")
-                try:
-                    data = []
-                    date = datetime.datetime.now().astimezone(timezone.utc)
-                    query_uuid = str(uuid.uuid4())
-                    api_chans = collegram.channels.search_from_api(client, kw)
-                    channels = api_chans
+    for kw, language_str, topic in keywords_data:
+        context.logger.info(f"### Started with keyword {kw}")
+        try:
+            data = []
+            date = datetime.datetime.now().astimezone(timezone.utc)
+            query_uuid = str(uuid.uuid4())
+            api_chans = collegram.channels.search_from_api(client, kw)
+            channels = api_chans
 
-                    for c_id, c_hash in channels.items():
-                        row = {
-                            "id": c_id,
-                            "access_hash": c_hash,
-                            "query_id": query_uuid,
-                            "search_date": date,
-                            "data_owner": os.environ["TELEGRAM_OWNER"],
-                            "search_keyword": kw,
-                            "language_code": language_code,
-                            "producer": "channels_to_query.{}".format(query_uuid),
-                        }
-                        data.append(row)
+            for c_id, c_hash in channels.items():
+                row = {
+                    "id": c_id,
+                    "access_hash": c_hash,
+                    "query_id": query_uuid,
+                    "search_date": date,
+                    "data_owner": os.environ["TELEGRAM_OWNER"],
+                    "search_keyword": kw,
+                    "search_topic": topic,
+                    "language_code": lang_d[language_str.lower()],
+                    "producer": "channels_to_query.{}".format(query_uuid),
+                }
+                data.append(row)
 
-                    # verify if they already exists
-                    rows_to_insert = remove_duplicates(connection, data)
-                    insert_into_postgres(connection, rows_to_insert)
-                    # send channels to be ranked
-                    for d in rows_to_insert:
-                        m = json.loads(json.dumps(d, default=_json_default))
-                        producer.send("chans_to_query", value=m)
-                except Exception as e:
-                    print("ERRO SEARCHING KEYWORD")
-                    print(kw)
-                    print(e)
-                    continue
+            # verify if they already exists
+            rows_to_insert = remove_duplicates(connection, data)
+            insert_into_postgres(connection, rows_to_insert)
+            # send channels to be ranked
+            for d in rows_to_insert:
+                m = json.loads(json.dumps(d, default=_json_default))
+                producer.send("chans_to_query", value=m)
+        except Exception as e:
+            print("ERRO SEARCHING KEYWORD")
+            print(kw)
+            print(e)
+            continue
 
     context.logger.info("# Ended keyword search")
     m = json.loads(json.dumps({"status": "init_done"}))

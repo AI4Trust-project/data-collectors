@@ -178,6 +178,8 @@ def handler(context, event):
 
     try:
         query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
+        update_d = {"id": channel_id, "channel_last_queried_at": query_time}
+        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
         channel_full = collegram.channels.get_full(
             client,
             channel_username=channel_username,
@@ -200,8 +202,6 @@ def handler(context, event):
         raise e
 
     context.logger.info(f"# Collecting channel metadata from channel {channel_id}")
-    update_d = {"id": channel_id, "channel_last_queried_at": query_time}
-    collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
 
     query_info = {
         "query_id": str(uuid.uuid4()),

@@ -180,8 +180,13 @@ def handler(context, event):
     nr_recommending_channels = data.get("nr_recommending_channels", 0)
     nr_linking_channels = data.get("nr_linking_channels", 0)
 
+    query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
+    query_info = {
+        "query_id": str(uuid.uuid4()),
+        "query_date": query_time,
+        "data_owner": os.environ["TELEGRAM_OWNER"],
+    }
     try:
-        query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
         update_d = {"id": channel_id, "channel_last_queried_at": query_time}
         collegram.utils.update_postgres(
             connection, "telegram.channels_to_query", update_d, "id"
@@ -205,15 +210,23 @@ def handler(context, event):
         context.logger.warning(
             f"Could not get channel metadata from channel {channel_id}"
         )
+        if isinstance(e, ChannelPrivateError):
+            flat_channel_d = {
+                "id": channel_id,
+                "username": channel_username,
+                "last_queried_at": query_time,
+                "is_private": True,
+                "table": "telegram-channel-metadata",
+                "query_id": query_info["query_id"],
+            }
+            # send channel metadata to iceberg
+            producer.send(
+                "telegram_collected_channels", value=iceberg_json_dumps(flat_channel_d)
+            )
         raise e
 
     context.logger.info(f"# Collecting channel metadata from channel {channel_id}")
 
-    query_info = {
-        "query_id": str(uuid.uuid4()),
-        "query_date": query_time,
-        "data_owner": os.environ["TELEGRAM_OWNER"],
-    }
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)

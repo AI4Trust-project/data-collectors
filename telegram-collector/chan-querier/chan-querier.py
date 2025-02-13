@@ -107,7 +107,9 @@ def handle_recommended(
             "nr_recommending_channels": 1,
             "distance_from_core": pred_dist_from_core + 1,
         }
-        collegram.utils.insert_into_postgres(connection, "telegram.channels_to_query", insert_d)
+        collegram.utils.insert_into_postgres(
+            connection, "telegram.channels_to_query", insert_d
+        )
         producer.send("chans_to_query", value=insert_d)
 
     else:
@@ -147,7 +149,9 @@ def handle_recommended(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
 
 
 def handler(context, event):
@@ -179,7 +183,9 @@ def handler(context, event):
     try:
         query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
         update_d = {"id": channel_id, "channel_last_queried_at": query_time}
-        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
         channel_full = collegram.channels.get_full(
             client,
             channel_username=channel_username,
@@ -297,7 +303,9 @@ def handler(context, event):
             "nr_participants": chat.participants_count,
             "nr_messages": channel_full_d["message_count"],
         }
-        collegram.utils.update_postgres(connection, "telegram.channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
 
         channel_full_d = collegram.channels.anon_full_dict(
             channel_full_d,

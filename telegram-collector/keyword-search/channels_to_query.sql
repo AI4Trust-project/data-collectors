@@ -9,6 +9,7 @@ CREATE TABLE telegram.channels_to_query(
     messages_last_queried_at TIMESTAMP,
     query_id VARCHAR(255),
     search_keyword VARCHAR(255),
+    search_topic VARCHAR(255),
     language_code VARCHAR(255),
     nr_participants INT,
     nr_messages INT,

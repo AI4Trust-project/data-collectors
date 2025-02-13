@@ -415,32 +415,40 @@ def handler(context, event):
     client = context.client
     connection = context.connection
 
-    query_fmt = (
-        "SELECT id, access_hash, username, messages_last_queried_at, distance_from_core"
-        " FROM {table}"
-        " ORDER BY collection_priority ASC"
-        " LIMIT 1"
-    )
+    only_top_priority = "ORDER BY collection_priority ASC LIMIT 1"
+    cols = "id, access_hash, username, messages_last_queried_at, distance_from_core"
     with connection.cursor() as cur:
         # First look for already-queried channel for which we need new messages
-        cur.execute(query_fmt.format(table="telegram.channels_to_requery"))
+        cur.execute(f"SELECT id FROM telegram.channels_to_requery {only_top_priority}")
         chan_to_query = cur.fetchone()
 
-        is_already_queried = chan_to_query is not None
-
-        if is_already_queried:
-            (channel_id, access_hash, channel_username, dt_from, distance_from_core) = (
-                chan_to_query
+    if chan_to_query is not None:
+        (channel_id,) = chan_to_query
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT {cols} FROM telegram.channels_to_query WHERE id = {channel_id}"
             )
-            with connection.cursor() as cur:
-                cur.execute(f"DELETE FROM telegram.channels_to_requery WHERE id = {channel_id}")
-
-        else:
-            # If there is none, query a new one.
-            cur.execute(query_fmt.format(table="telegram.channels_to_query"))
             chan_to_query = cur.fetchone()
-            if chan_to_query is None:
-                return
+            try:
+                cur.execute(
+                    f"DELETE FROM telegram.channels_to_requery WHERE id = {channel_id}"
+                )
+                connection.commit()
+            except Exception as e:
+                print(e)
+                cur.execute("ROLLBACK")
+                connection.commit()
+
+    else:
+        # If there is no channel in the requerying queue, query a new one.
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT {cols} FROM telegram.channels_to_query {only_top_priority}"
+            )
+            chan_to_query = cur.fetchone()
+
+    if chan_to_query is None:
+        return
 
     (channel_id, access_hash, channel_username, dt_from, distance_from_core) = (
         chan_to_query

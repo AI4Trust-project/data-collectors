@@ -166,7 +166,7 @@ def handle_linked_chan(
         " nr_recommending_channels,"
         " nr_linking_channels,"
         " distance_from_core"
-        " FROM channels_to_query"
+        " FROM telegram.channels_to_query"
     )
     with connection.cursor() as cur:
         cur.execute(base_query + f" WHERE username = '{linked_username}'")
@@ -289,7 +289,7 @@ def handle_forward(
             " nr_recommending_channels,"
             " nr_linking_channels,"
             " distance_from_core"
-            " FROM channels_to_query"
+            " FROM telegram.channels_to_query"
             f" WHERE id = {fwd_id}"
         )
         prio_info = cur.fetchone()
@@ -427,7 +427,7 @@ def handler(context, event):
                 chan_to_query
             )
             with connection.cursor() as cur:
-                cur.execute(f"DELETE FROM channels_to_requery WHERE id = {channel_id}")
+                cur.execute(f"DELETE FROM telegram.channels_to_requery WHERE id = {channel_id}")
 
         else:
             # If there is none, query a new one.
@@ -507,6 +507,7 @@ def handler(context, event):
             if is_last_saved_period:
                 # Get the offset in case collection was unexpectedly interrupted
                 # while writing for this time range.
+                # TODO: remove, replace with postgres query
                 last_message_saved = collegram.utils.read_nth_to_last_line(
                     messages_save_path,
                     fs=fs,
@@ -544,6 +545,7 @@ def handler(context, event):
                 )
             )
 
+            # TODO: write to postgres last_message_id
             # Save metadata about the query itself
             m = json.loads(json.dumps(query_info, default=_json_default))
             m["table"] = "telegram-queries"

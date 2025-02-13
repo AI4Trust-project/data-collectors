@@ -94,7 +94,7 @@ def handle_recommended(
             " nr_recommending_channels,"
             " nr_linking_channels,"
             " distance_from_core"
-            " FROM channels_to_query"
+            " FROM telegram.channels_to_query"
             f" WHERE id = {rec_id}"
         )
         prio_info = cur.fetchone()

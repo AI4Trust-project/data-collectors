@@ -1,4 +1,4 @@
-CREATE TABLE channels_to_requery(
+CREATE TABLE telegram.channels_to_requery(
     id BIGINT PRIMARY KEY,
     access_hash BIGINT NOT NULL,
     username VARCHAR(255),

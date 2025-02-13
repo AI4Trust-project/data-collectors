@@ -98,7 +98,7 @@ def remove_duplicates(conn, values: list):
         cur = conn.cursor()
         for v in values:
             query = (
-                "SELECT id, access_hash FROM channels_to_query"
+                "SELECT id, access_hash FROM telegram.channels_to_query"
                 " WHERE id = %s AND access_hash = %s"
             )
 

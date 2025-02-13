@@ -1,4 +1,4 @@
-CREATE TABLE telegram_message_url_links(
+CREATE TABLE telegram.message_url_links(
     linking_channel_id BIGINT NOT NULL,
     linked_channel_id BIGINT,
     linked_channel_username VARCHAR(255),

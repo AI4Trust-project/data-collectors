@@ -6,7 +6,6 @@ import uuid
 from pathlib import Path
 
 import collegram
-import fsspec
 import nest_asyncio
 import psycopg
 from kafka import KafkaProducer
@@ -21,17 +20,6 @@ from telethon.sessions import StringSession
 
 
 async def init_context(context):
-    access_key = os.environ["MINIO_ACCESS_KEY"]
-    secret = os.environ["MINIO_SECRET_KEY"]
-    minio_home = os.environ["MINIO_HOME"]
-    storage_options = {
-        "endpoint_url": f"https://{minio_home}",
-        "key": access_key,
-        "secret": secret,
-    }
-    fs = fsspec.filesystem("s3", **storage_options)
-    setattr(context, "fs", fs)
-
     # Connect to an existing database
     connection = psycopg.connect(
         user=os.environ["POSTGRES_USER"],
@@ -166,7 +154,6 @@ def handler(context, event):
         lc: 1e-3 for lc in ["EN", "FR", "ES", "DE", "EL", "IT", "PL", "RO"]
     }
 
-    fs = context.fs
     producer = context.producer
     client = context.client
     connection = context.connection
@@ -226,7 +213,6 @@ def handler(context, event):
         raise e
 
     context.logger.info(f"# Collecting channel metadata from channel {channel_id}")
-
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)
@@ -324,7 +310,13 @@ def handler(context, event):
             channel_full_d,
             anonymiser,
         )
-        collegram.channels.save(channel_full_d, paths, key_name, fs=fs)
+        channel_full_d = collegram.channels.record_keys_hash(channel_full_d, key_name)
+        channel_full_d["table"] = "telegram-raw-channel-metadata"
+        channel_full_d["query_id"] = query_info["query_id"]
+        # send raw channel metadata to iceberg
+        producer.send(
+            "telegram_raw_collected_channels", value=iceberg_json_dumps(channel_full_d)
+        )
 
         flat_channel_d = collegram.channels.flatten_dict(channel_full_d)
         flat_channel_d["table"] = "telegram-channel-metadata"

@@ -196,7 +196,7 @@ def handle_linked_chan(
             collegram.utils.insert_into_postgres(
                 connection, "telegram.channels_to_query", insert_d
             )
-            producer.send("chans_to_query", value=insert_d)
+            producer.send("telegram.chans_to_query", value=insert_d)
 
     if exists:
         (
@@ -310,7 +310,7 @@ def handle_forward(
         collegram.utils.insert_into_postgres(
             connection, "telegram.channels_to_query", insert_d
         )
-        producer.send("chans_to_query", value=insert_d)
+        producer.send("telegram.chans_to_query", value=insert_d)
 
     else:
         (
@@ -542,8 +542,7 @@ def handler(context, event):
         )
         # Save metadata about the query itself
         m = json.loads(json.dumps(query_info, default=_json_default))
-        m["table"] = "telegram-queries"
-        producer.send("telegram_collected_metadata", value=m)
+        producer.send("telegram.queries", value=m)
 
         for fwd_id, fwd_stats in chunk_fwds_stats.items():
             prev_stats = forwarded_chans_stats.get(fwd_id)
@@ -577,4 +576,4 @@ def handler(context, event):
 
     # Send a message to call this querier again.
     m = json.loads(json.dumps({"status": "chan_message_collection_done"}))
-    producer.send("chans_to_message", m)
+    producer.send("telegram.chans_to_message", m)

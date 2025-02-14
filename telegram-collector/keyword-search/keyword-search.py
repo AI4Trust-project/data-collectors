@@ -3,7 +3,6 @@ import json
 import os
 import uuid
 from datetime import timezone
-from pathlib import Path
 
 import collegram
 import nest_asyncio
@@ -171,7 +170,7 @@ def handler(context, event):
             # send channels to be ranked
             for d in rows_to_insert:
                 m = json.loads(json.dumps(d, default=_json_default))
-                producer.send("chans_to_query", value=m)
+                producer.send("telegram.chans_to_query", value=m)
         except Exception as e:
             print("ERRO SEARCHING KEYWORD")
             print(kw)
@@ -180,4 +179,4 @@ def handler(context, event):
 
     context.logger.info("# Ended keyword search")
     m = json.loads(json.dumps({"status": "init_done"}))
-    producer.send("telegram-keywords", value=m)
+    producer.send("telegram.keywords", value=m)

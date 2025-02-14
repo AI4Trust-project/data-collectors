@@ -98,7 +98,7 @@ def handle_recommended(
         collegram.utils.insert_into_postgres(
             connection, "telegram.channels_to_query", insert_d
         )
-        producer.send("chans_to_query", value=insert_d)
+        producer.send("telegram.chans_to_query", value=insert_d)
 
     else:
         (
@@ -203,12 +203,11 @@ def handler(context, event):
                 "username": channel_username,
                 "last_queried_at": query_time,
                 "is_private": True,
-                "table": "telegram-channel-metadata",
                 "query_id": query_info["query_id"],
             }
             # send channel metadata to iceberg
             producer.send(
-                "telegram_collected_channels", value=iceberg_json_dumps(flat_channel_d)
+                "telegram.channel_metadata", value=iceberg_json_dumps(flat_channel_d)
             )
         raise e
 
@@ -311,19 +310,17 @@ def handler(context, event):
             anonymiser,
         )
         channel_full_d = collegram.channels.record_keys_hash(channel_full_d, key_name)
-        channel_full_d["table"] = "telegram-raw-channel-metadata"
         channel_full_d["query_id"] = query_info["query_id"]
         # send raw channel metadata to iceberg
         producer.send(
-            "telegram_raw_collected_channels", value=iceberg_json_dumps(channel_full_d)
+            "telegram.raw_channel_metadata", value=iceberg_json_dumps(channel_full_d)
         )
 
         flat_channel_d = collegram.channels.flatten_dict(channel_full_d)
-        flat_channel_d["table"] = "telegram-channel-metadata"
         flat_channel_d["query_id"] = query_info["query_id"]
         # send channel metadata to iceberg
         producer.send(
-            "telegram_collected_channels", value=iceberg_json_dumps(flat_channel_d)
+            "telegram.channel_metadata", value=iceberg_json_dumps(flat_channel_d)
         )
 
         # Save metadata about the query itself
@@ -331,5 +328,4 @@ def handler(context, event):
         chan_paths = collegram.paths.ChannelPaths(chat.id, paths)
         query_info["result_path"] = str(chan_paths.channel.absolute())
         m = json.loads(json.dumps(query_info, default=_json_default))
-        m["table"] = "telegram-queries"
-        producer.send("telegram_collected_metadata", value=m)
+        producer.send("telegram.queries", value=m)

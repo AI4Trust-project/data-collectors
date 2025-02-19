@@ -6,7 +6,6 @@ import uuid
 from pathlib import Path
 
 import collegram
-import fsspec
 import nest_asyncio
 import psycopg
 from kafka import KafkaProducer
@@ -21,17 +20,6 @@ from telethon.sessions import StringSession
 
 
 async def init_context(context):
-    access_key = os.environ["MINIO_ACCESS_KEY"]
-    secret = os.environ["MINIO_SECRET_KEY"]
-    minio_home = os.environ["MINIO_HOME"]
-    storage_options = {
-        "endpoint_url": f"https://{minio_home}",
-        "key": access_key,
-        "secret": secret,
-    }
-    fs = fsspec.filesystem("s3", **storage_options)
-    setattr(context, "fs", fs)
-
     # Connect to an existing database
     connection = psycopg.connect(
         user=os.environ["POSTGRES_USER"],
@@ -94,7 +82,7 @@ def handle_recommended(
             " nr_recommending_channels,"
             " nr_linking_channels,"
             " distance_from_core"
-            " FROM channels_to_query"
+            " FROM telegram.channels_to_query"
             f" WHERE id = {rec_id}"
         )
         prio_info = cur.fetchone()
@@ -107,8 +95,10 @@ def handle_recommended(
             "nr_recommending_channels": 1,
             "distance_from_core": pred_dist_from_core + 1,
         }
-        collegram.utils.insert_into_postgres(connection, "channels_to_query", insert_d)
-        producer.send("chans_to_query", value=insert_d)
+        collegram.utils.insert_into_postgres(
+            connection, "telegram.channels_to_query", insert_d
+        )
+        producer.send("telegram.chans_to_query", value=insert_d)
 
     else:
         (
@@ -147,7 +137,9 @@ def handle_recommended(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
 
 
 def handler(context, event):
@@ -162,7 +154,6 @@ def handler(context, event):
         lc: 1e-3 for lc in ["EN", "FR", "ES", "DE", "EL", "IT", "PL", "RO"]
     }
 
-    fs = context.fs
     producer = context.producer
     client = context.client
     connection = context.connection
@@ -176,8 +167,17 @@ def handler(context, event):
     nr_recommending_channels = data.get("nr_recommending_channels", 0)
     nr_linking_channels = data.get("nr_linking_channels", 0)
 
+    query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
+    query_info = {
+        "query_id": str(uuid.uuid4()),
+        "query_date": query_time,
+        "data_owner": os.environ["TELEGRAM_OWNER"],
+    }
     try:
-        query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
+        update_d = {"id": channel_id, "channel_last_queried_at": query_time}
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
         channel_full = collegram.channels.get_full(
             client,
             channel_username=channel_username,
@@ -197,17 +197,21 @@ def handler(context, event):
         context.logger.warning(
             f"Could not get channel metadata from channel {channel_id}"
         )
+        if isinstance(e, ChannelPrivateError):
+            flat_channel_d = {
+                "id": channel_id,
+                "username": channel_username,
+                "last_queried_at": query_time,
+                "is_private": True,
+                "query_id": query_info["query_id"],
+            }
+            # send channel metadata to iceberg
+            producer.send(
+                "telegram.channel_metadata", value=iceberg_json_dumps(flat_channel_d)
+            )
         raise e
 
     context.logger.info(f"# Collecting channel metadata from channel {channel_id}")
-    update_d = {"id": channel_id, "channel_last_queried_at": query_time}
-    collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
-
-    query_info = {
-        "query_id": str(uuid.uuid4()),
-        "query_date": query_time,
-        "data_owner": os.environ["TELEGRAM_OWNER"],
-    }
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)
@@ -215,7 +219,7 @@ def handler(context, event):
     def insert_anon_pair(original, anonymised):
         insert_d = {"original": original, "anonymised": anonymised}
         collegram.utils.insert_into_postgres(
-            connection, table="anonymisation_map", values=insert_d
+            connection, table="telegram.anonymisation_map", values=insert_d
         )
 
     anonymiser = collegram.utils.HMAC_anonymiser(save_func=insert_anon_pair)
@@ -239,7 +243,7 @@ def handler(context, event):
             query_info["query_id"] = str(uuid.uuid4())
             update_d = {"id": channel_id, "channel_last_queried_at": query_time}
             collegram.utils.update_postgres(
-                connection, "channels_to_query", update_d, "id"
+                connection, "telegram.channels_to_query", update_d, "id"
             )
 
         channel_full_d = json.loads(channel_full.to_json())
@@ -297,20 +301,26 @@ def handler(context, event):
             "nr_participants": chat.participants_count,
             "nr_messages": channel_full_d["message_count"],
         }
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
 
         channel_full_d = collegram.channels.anon_full_dict(
             channel_full_d,
             anonymiser,
         )
-        collegram.channels.save(channel_full_d, paths, key_name, fs=fs)
+        channel_full_d = collegram.channels.record_keys_hash(channel_full_d, key_name)
+        channel_full_d["query_id"] = query_info["query_id"]
+        # send raw channel metadata to iceberg
+        producer.send(
+            "telegram.raw_channel_metadata", value=iceberg_json_dumps(channel_full_d)
+        )
 
         flat_channel_d = collegram.channels.flatten_dict(channel_full_d)
-        flat_channel_d["table"] = "telegram-channel-metadata"
         flat_channel_d["query_id"] = query_info["query_id"]
         # send channel metadata to iceberg
         producer.send(
-            "telegram_collected_channels", value=iceberg_json_dumps(flat_channel_d)
+            "telegram.channel_metadata", value=iceberg_json_dumps(flat_channel_d)
         )
 
         # Save metadata about the query itself
@@ -318,5 +328,4 @@ def handler(context, event):
         chan_paths = collegram.paths.ChannelPaths(chat.id, paths)
         query_info["result_path"] = str(chan_paths.channel.absolute())
         m = json.loads(json.dumps(query_info, default=_json_default))
-        m["table"] = "telegram-queries"
-        producer.send("telegram_collected_metadata", value=m)
+        producer.send("telegram.queries", value=m)

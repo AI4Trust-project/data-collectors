@@ -1,4 +1,4 @@
-CREATE TABLE channels_to_query(
+CREATE TABLE telegram.channels_to_query(
     id BIGINT PRIMARY KEY,
     access_hash BIGINT NOT NULL,
     username VARCHAR(255),
@@ -7,8 +7,10 @@ CREATE TABLE channels_to_query(
     created_at TIMESTAMP,
     channel_last_queried_at TIMESTAMP,
     messages_last_queried_at TIMESTAMP,
+    last_queried_message_id INT DEFAULT 0,
     query_id VARCHAR(255),
     search_keyword VARCHAR(255),
+    search_topic VARCHAR(255),
     language_code VARCHAR(255),
     nr_participants INT,
     nr_messages INT,

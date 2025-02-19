@@ -1,4 +1,3 @@
-import base64
 import datetime
 import json
 import os
@@ -130,7 +129,7 @@ def handle_linked_chan(
     with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(
             "SELECT nr_messages, first_message_date, last_message_date"
-            " FROM telegram_message_url_links"
+            " FROM telegram.message_url_links"
             f" WHERE linking_channel_id = {channel_id}"
             f" AND linked_channel_username = '{linked_username}'"
         )
@@ -144,12 +143,12 @@ def handle_linked_chan(
     }
     if prev_stats is None:
         collegram.utils.insert_into_postgres(
-            connection, "telegram_message_url_links", links_table_update_d
+            connection, "telegram.message_url_links", links_table_update_d
         )
     else:
         collegram.utils.update_postgres(
             connection,
-            "telegram_message_url_links",
+            "telegram.message_url_links",
             links_table_update_d,
             ["linking_channel_id", "linked_channel_username"],
         )
@@ -166,7 +165,7 @@ def handle_linked_chan(
         " nr_recommending_channels,"
         " nr_linking_channels,"
         " distance_from_core"
-        " FROM channels_to_query"
+        " FROM telegram.channels_to_query"
     )
     with connection.cursor() as cur:
         cur.execute(base_query + f" WHERE username = '{linked_username}'")
@@ -195,9 +194,9 @@ def handle_linked_chan(
                 "distance_from_core": pred_dist_from_core + 1,
             }
             collegram.utils.insert_into_postgres(
-                connection, "channels_to_query", insert_d
+                connection, "telegram.channels_to_query", insert_d
             )
-            producer.send("chans_to_query", value=insert_d)
+            producer.send("telegram.chans_to_query", value=insert_d)
 
     if exists:
         (
@@ -238,7 +237,9 @@ def handle_linked_chan(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
 
 
 def handle_forward(
@@ -254,7 +255,7 @@ def handle_forward(
     with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(
             "SELECT nr_messages, first_message_date, last_message_date"
-            " FROM telegram_message_forward_links"
+            " FROM telegram.message_forward_links"
             f" WHERE linking_channel_id = {channel_id} AND linked_channel_id = {fwd_id}"
         )
         prev_stats = cur.fetchone()
@@ -267,12 +268,12 @@ def handle_forward(
     }
     if prev_stats is None:
         collegram.utils.insert_into_postgres(
-            connection, "telegram_message_forward_links", fwds_table_update_d
+            connection, "telegram.message_forward_links", fwds_table_update_d
         )
     else:
         collegram.utils.update_postgres(
             connection,
-            "telegram_message_forward_links",
+            "telegram.message_forward_links",
             fwds_table_update_d,
             ["linking_channel_id", "linked_channel_id"],
         )
@@ -289,7 +290,7 @@ def handle_forward(
             " nr_recommending_channels,"
             " nr_linking_channels,"
             " distance_from_core"
-            " FROM channels_to_query"
+            " FROM telegram.channels_to_query"
             f" WHERE id = {fwd_id}"
         )
         prio_info = cur.fetchone()
@@ -306,8 +307,10 @@ def handle_forward(
             "nr_forwarding_channels": 1,
             "distance_from_core": pred_dist_from_core + 1,
         }
-        collegram.utils.insert_into_postgres(connection, "channels_to_query", insert_d)
-        producer.send("chans_to_query", value=insert_d)
+        collegram.utils.insert_into_postgres(
+            connection, "telegram.channels_to_query", insert_d
+        )
+        producer.send("telegram.chans_to_query", value=insert_d)
 
     else:
         (
@@ -347,7 +350,9 @@ def handle_forward(
             )
             update_d["collection_priority"] = priority
 
-        collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
 
 
 async def collect_messages(
@@ -358,41 +363,45 @@ async def collect_messages(
     forwards_stats: dict[int, dict],
     linked_chans_stats: dict[str, dict],
     anon_func,
-    messages_save_path: Path,
     media_save_path: Path,
     fs,
     producer,
     query_id,
     offset_id=0,
 ):
-    with fs.open(messages_save_path, "a") as f:
-        async for m in collegram.messages.yield_channel_messages(
-            client,
-            channel,
-            dt_from,
-            dt_to,
-            forwards_stats,
-            linked_chans_stats,
-            anon_func,
-            media_save_path,
-            offset_id=offset_id,
-            fs=fs,
-        ):
-            m_json = m.to_json()
-            f.write(m_json)
-            f.write("\n")
-
-            # MessageService have so many potential structures that putting them in a
-            # table does not make sense.
-            if not isinstance(m, MessageService):
-                m_dict = collegram.messages.to_flat_dict(m)
-                m_dict["table"] = "telegram-channel-messages"
-                m_dict["channel_id"] = channel.channel_id
-                m_dict["query_id"] = query_id
-                # send message to iceberg
-                producer.send(
-                    "telegram_collected_messages", value=iceberg_json_dumps(m_dict)
-                )
+    last_id = offset_id
+    # Pass `fs` to following call to write embedded web pages as json artifacts
+    async for m in collegram.messages.yield_channel_messages(
+        client,
+        channel,
+        dt_from,
+        dt_to,
+        forwards_stats,
+        linked_chans_stats,
+        anon_func,
+        media_save_path,
+        offset_id=offset_id,
+        fs=fs,
+    ):
+        m_dict = m.to_dict()
+        m_dict["channel_id"] = channel.channel_id
+        m_dict["query_id"] = query_id
+        # MessageService have so many potential structures that putting them together
+        # with normal messages in a table does not make sense.
+        if isinstance(m, MessageService):
+            producer.send(
+                "telegram.raw_service_messages", value=iceberg_json_dumps(m_dict)
+            )
+        else:
+            producer.send(
+                "telegram.raw_messages", value=iceberg_json_dumps(m_dict)
+            )
+            m_dict = collegram.messages.flatten_dict(m, m_dict)
+            producer.send(
+                "telegram.messages", value=iceberg_json_dumps(m_dict)
+            )
+        last_id = m.id
+    return last_id
 
 
 def handler(context, event):
@@ -409,34 +418,48 @@ def handler(context, event):
     client = context.client
     connection = context.connection
 
-    query_fmt = (
-        "SELECT id, access_hash, username, messages_last_queried_at, distance_from_core"
-        " FROM {table}"
-        " ORDER BY collection_priority ASC"
-        " LIMIT 1"
-    )
+    only_top_priority = "ORDER BY collection_priority ASC LIMIT 1"
+    cols = "id, access_hash, username, messages_last_queried_at, last_queried_message_id, distance_from_core"
     with connection.cursor() as cur:
         # First look for already-queried channel for which we need new messages
-        cur.execute(query_fmt.format(table="channels_to_requery"))
+        cur.execute(f"SELECT id FROM telegram.channels_to_requery {only_top_priority}")
         chan_to_query = cur.fetchone()
 
-        is_already_queried = chan_to_query is not None
-
-        if not is_already_queried:
-            # If there is none, query a new one.
-            cur.execute(query_fmt.format(table="channels_to_query"))
+    if chan_to_query is not None:
+        (channel_id,) = chan_to_query
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT {cols} FROM telegram.channels_to_query WHERE id = {channel_id}"
+            )
             chan_to_query = cur.fetchone()
-            if chan_to_query is None:
-                return
+            try:
+                cur.execute(
+                    f"DELETE FROM telegram.channels_to_requery WHERE id = {channel_id}"
+                )
+                connection.commit()
+            except Exception as e:
+                print(e)
+                cur.execute("ROLLBACK")
+                connection.commit()
 
-    (channel_id, access_hash, channel_username, dt_from, distance_from_core) = (
+    else:
+        # If there is no channel in the requerying queue, query a new one.
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT {cols} FROM telegram.channels_to_query {only_top_priority}"
+            )
+            chan_to_query = cur.fetchone()
+
+    if chan_to_query is None:
+        return
+
+    (channel_id, access_hash, channel_username, dt_from, last_queried_message_id, distance_from_core) = (
         chan_to_query
     )
 
     data_path = Path("/telegram/")
     paths = collegram.paths.ProjectPaths(data=data_path)
     media_save_path = paths.raw_data / "media"
-    chan_paths = collegram.paths.ChannelPaths(channel_id, paths)
 
     full_chat_d = collegram.channels.load(channel_id, paths, fs=fs)
     chat_d = collegram.channels.get_matching_chat_from_full(full_chat_d, channel_id)
@@ -459,7 +482,7 @@ def handler(context, event):
     def insert_anon_pair(original, anonymised):
         insert_d = {"original": original, "anonymised": anonymised}
         collegram.utils.insert_into_postgres(
-            connection, table="anonymisation_map", values=insert_d
+            connection, table="telegram.anonymisation_map", values=insert_d
         )
 
     anonymiser = collegram.utils.HMAC_anonymiser(save_func=insert_anon_pair)
@@ -470,8 +493,11 @@ def handler(context, event):
     )
     query_time = global_dt_to
     update_d = {"id": channel_id, "messages_last_queried_at": query_time}
-    collegram.utils.update_postgres(connection, "channels_to_query", update_d, "id")
+    collegram.utils.update_postgres(
+        connection, "telegram.channels_to_query", update_d, "id"
+    )
 
+    # Collect by chunks of a month to limit effects of a crash on the collection.
     dt_bin_edges = pl.datetime_range(
         dt_from, global_dt_to, interval="1mo", eager=True, time_zone="UTC"
     )
@@ -479,103 +505,75 @@ def handler(context, event):
     forwarded_chans_stats = {}
     linked_chans_stats = {}
 
-    # Caution: the sorting only works because of file name format!
-    existing_files = sorted(list(fs.glob(f"{chan_paths.messages}/*.jsonl")))
-
     for dt_from, dt_to in zip(dt_bin_edges[:-1], dt_bin_edges[1:]):
         chunk_fwds_stats = {}
         chunk_linked_chans_stats = {}
-        dt_from_in_path = dt_from.replace(
-            day=1, hour=0, minute=0, second=0, microsecond=0
-        ).date()
-        messages_save_path = (
-            chan_paths.messages / f"{dt_from_in_path}_to_{dt_to.date()}.jsonl"
-        )
-        is_last_saved_period = (
-            len(existing_files) > 0 and messages_save_path == existing_files[-1]
-        )
 
-        if not fs.exists(messages_save_path) or is_last_saved_period:
-            offset_id = 0
-            if is_last_saved_period:
-                # Get the offset in case collection was unexpectedly interrupted
-                # while writing for this time range.
-                last_message_saved = collegram.utils.read_nth_to_last_line(
-                    messages_save_path,
-                    fs=fs,
-                )
-                # Check if not empty file before reading message
-                if last_message_saved:
-                    offset_id = collegram.json.read_message(last_message_saved).id
+        query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
+        query_info = {
+            "query_id": str(uuid.uuid4()),
+            "query_date": query_time,
+            "data_owner": os.environ["TELEGRAM_OWNER"],
+            "channel_id": input_chat.channel_id,
+            "message_offset_id": last_queried_message_id,
+        }
 
-            query_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
-            query_info = {
-                "query_id": str(uuid.uuid4()),
-                "query_date": query_time,
-                "data_owner": os.environ["TELEGRAM_OWNER"],
-                "channel_id": input_chat.channel_id,
-                "message_offset_id": offset_id,
-                "result_path": str(messages_save_path.absolute()),
-            }
-
-            context.logger.info(f"## Collecting messages from {dt_from} to {dt_to}")
-            client.loop.run_until_complete(
-                collect_messages(
-                    client,
-                    input_chat,
-                    dt_from,
-                    dt_to,
-                    chunk_fwds_stats,
-                    chunk_linked_chans_stats,
-                    anonymiser.anonymise,
-                    messages_save_path,
-                    media_save_path,
-                    fs,
-                    producer,
-                    query_info["query_id"],
-                    offset_id=offset_id,
-                )
+        context.logger.info(f"## Collecting messages from {dt_from} to {dt_to}")
+        last_queried_message_id = client.loop.run_until_complete(
+            collect_messages(
+                client,
+                input_chat,
+                dt_from,
+                dt_to,
+                chunk_fwds_stats,
+                chunk_linked_chans_stats,
+                anonymiser.anonymise,
+                media_save_path,
+                fs,
+                producer,
+                query_info["query_id"],
+                offset_id=last_queried_message_id,
             )
+        )
 
-            # Save metadata about the query itself
-            m = json.loads(json.dumps(query_info, default=_json_default))
-            m["table"] = "telegram-queries"
-            producer.send("telegram_collected_metadata", value=m)
+        update_d = {"id": channel_id, "last_queried_message_id": last_queried_message_id}
+        collegram.utils.update_postgres(
+            connection, "telegram.channels_to_query", update_d, "id"
+        )
+        # Save metadata about the query itself
+        m = json.loads(json.dumps(query_info, default=_json_default))
+        producer.send("telegram.queries", value=m)
 
-            for fwd_id, fwd_stats in chunk_fwds_stats.items():
-                prev_stats = forwarded_chans_stats.get(fwd_id)
-                end_chunk_stats = get_new_link_stats(prev_stats, fwd_stats)
-                handle_forward(
-                    channel_id,
-                    fwd_id,
-                    end_chunk_stats,
-                    client,
-                    connection,
-                    distance_from_core,
-                    producer,
-                    lang_priorities,
-                )
-                forwarded_chans_stats[fwd_id] = end_chunk_stats
+        for fwd_id, fwd_stats in chunk_fwds_stats.items():
+            prev_stats = forwarded_chans_stats.get(fwd_id)
+            end_chunk_stats = get_new_link_stats(prev_stats, fwd_stats)
+            handle_forward(
+                channel_id,
+                fwd_id,
+                end_chunk_stats,
+                client,
+                connection,
+                distance_from_core,
+                producer,
+                lang_priorities,
+            )
+            forwarded_chans_stats[fwd_id] = end_chunk_stats
 
-            for link_un, link_stats in chunk_linked_chans_stats.items():
-                prev_stats = linked_chans_stats.get(link_un)
-                end_chunk_stats = get_new_link_stats(prev_stats, link_stats)
-                handle_linked_chan(
-                    channel_id,
-                    link_un,
-                    end_chunk_stats,
-                    client,
-                    connection,
-                    distance_from_core,
-                    producer,
-                    lang_priorities,
-                )
-                linked_chans_stats[link_un] = end_chunk_stats
-
-    if is_already_queried:
-        with connection.cursor() as cur:
-            cur.execute(f"DELETE FROM channels_to_requery WHERE id = {channel_id}")
+        for link_un, link_stats in chunk_linked_chans_stats.items():
+            prev_stats = linked_chans_stats.get(link_un)
+            end_chunk_stats = get_new_link_stats(prev_stats, link_stats)
+            handle_linked_chan(
+                channel_id,
+                link_un,
+                end_chunk_stats,
+                client,
+                connection,
+                distance_from_core,
+                producer,
+                lang_priorities,
+            )
+            linked_chans_stats[link_un] = end_chunk_stats
 
     # Send a message to call this querier again.
     m = json.loads(json.dumps({"status": "chan_message_collection_done"}))
-    producer.send("chans_to_message", m)
+    producer.send("telegram.chans_to_message", m)

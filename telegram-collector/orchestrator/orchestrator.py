@@ -29,7 +29,7 @@ def handler(context, event):
         dt_from_str = dt_from.isoformat()
         cur.execute(
             "SELECT id, access_hash, username, messages_last_queried_at, distance_from_core, collection_priority"
-            " FROM channels_to_query"
+            " FROM telegram.channels_to_query"
             f" WHERE messages_last_queried_at < TIMESTAMP '{dt_from_str}'"
         )
         for record in cur:

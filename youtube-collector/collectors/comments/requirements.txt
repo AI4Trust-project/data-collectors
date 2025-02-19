@@ -1,1 +1,0 @@
-pip install kafka-python minio google-api-python-client psycopg2

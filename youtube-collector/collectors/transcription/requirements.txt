@@ -1,1 +1,0 @@
-pip install kafka-python psycopg2 minio youtube-transcript-api
